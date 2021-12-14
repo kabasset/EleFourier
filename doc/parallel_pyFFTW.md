@@ -133,7 +133,7 @@ def create_complex_plan(shape):
 def create_real_plan(shape):
     i = pyfftw.empty_aligned(shape, dtype='float64')
     o = pyfftw.empty_aligned(shape, dtype='complex128')
-    return DFT(pyfftw.FFTW(i, o), pyfftw(o, i)
+    return DFT(pyfftw.FFTW(i, o), pyfftw.FFTW(o, i)
 ```
 
 
