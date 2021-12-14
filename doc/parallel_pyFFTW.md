@@ -36,7 +36,7 @@ This is why there is **no such thing** as:
 output = fftw.dft(input)
 ```
 
-## Memory layout
+### Memory layout
 
 Because efficiency is tightly coupled with memory layout,
 the Planning requires **predefined addresses** for the input and output arrays,
