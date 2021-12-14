@@ -115,8 +115,8 @@ which must have been allocated with a dedicated SIMD-aware function `empty_align
 When transform and inverse transform of the same data must be performed, two Plans must be created.
 In this case, it is optimal to use the same Buffers for both Plans.
 
-This avoids polluting production code with low-level boilerplate,
-and ensures forward and backward Plans are coherent,
+To avoid polluting production code with low-level boilerplate,
+and to ensure forward and backward Plans are coherent,
 a ligth Plan wrapper and Plan makers can be implemented easily:
 
 ```python
@@ -160,7 +160,7 @@ plan()
 output[:] = plan.output_array
 ```
 
-This construct are useful to work with in-place transforms (cumbersome option 1),
+This construct is useful to work with in-place transforms (cumbersome, yet optimal option 1),
 but not needed with the standalone array approach (more natural option 2).
 The latter approach is common enough that pyFFTW provides a shortcut:
 The call operator can take as argument an input array, which will be copied,
@@ -178,7 +178,8 @@ output = plan(input)
 
 ## Wrap-up
 
-Using the proposed `DFT` wrapper, executing forward and backward plans in multiple threads is quite straightforward:
+Using the proposed `DFT` wrapper, executing forward and backward Plans
+inside multiple threads is quite straightforward:
 
 ```python
 # Create one plan per shape and per thread
