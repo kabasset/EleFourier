@@ -28,27 +28,14 @@
 namespace Euclid {
 namespace Fourier {
 
-class ComplexToComplex {
-
-public:
+struct ComplexToComplex {
   using Value = std::complex<double>;
   using Coef = std::complex<double>;
-  ComplexToComplex(Fits::Raster<Value, 3>& image, Fits::Raster<Coef, 3>& coefs);
-
-private:
-  fftw_plan m_transform;
-  fftw_plan m_inverse;
 };
 
-class RealToComplex {
-public:
+struct RealToComplex {
   using Value = double;
   using Coef = std::complex<double>;
-  RealToComplex(Fits::Raster<Value, 3>& image, Fits::Raster<Coef, 3>& coefs);
-
-private:
-  fftw_plan m_transform;
-  fftw_plan m_inverse;
 };
 
 namespace Internal {
@@ -59,43 +46,16 @@ Fits::PtrRaster<T, 3> makeFftwRaster(long width, long height, long count) {
   return {{width, height, count}, data};
 }
 
-fftw_plan makeFftwTransformPlan(Fits::Raster<double, 3>& image, Fits::Raster<std::complex<double>, 3>& coefs) {
-  const int width = static_cast<int>(image.shape()[0]);
-  const int height = static_cast<int>(image.shape()[1]);
-  int n[] = {height, width}; // FFTW ordering
-  return fftw_plan_many_dft_r2c(
-      2, // rank
-      n, // n
-      image.shape()[2], // howmany
-      reinterpret_cast<double*>(image.data()), // in
-      nullptr, // inembed
-      1, // istride
-      width * height, // idist
-      reinterpret_cast<fftw_complex*>(coefs.data()), // out
-      nullptr, // onembed
-      1, // ostride
-      (width / 2 + 1) * height, // odist
-      FFTW_MEASURE); // FIXME other flags?
-}
+template <typename TDomains>
+fftw_plan
+makeFftwTransform(Fits::Raster<typename TDomains::Value, 3>& image, Fits::Raster<typename TDomains::Coef, 3>& coefs);
 
-fftw_plan makeFftwInversePlan(Fits::Raster<double, 3>& image, Fits::Raster<std::complex<double>, 3>& coefs) {
-  const int width = static_cast<int>(image.shape()[0]);
-  const int height = static_cast<int>(image.shape()[1]);
-  int n[] = {height, width}; // FFTW ordering
-  return fftw_plan_many_dft_c2r(
-      2, // rank
-      n, // n
-      image.shape()[2], // howmany
-      reinterpret_cast<fftw_complex*>(coefs.data()), // in
-      nullptr, // inembed
-      1, // istride
-      (width / 2 + 1) * height, // idist
-      reinterpret_cast<double*>(image.data()), // out
-      nullptr, // onembed
-      1, // ostride
-      width * height, // odist
-      FFTW_MEASURE); // FIXME other flags?
-}
+template <typename TDomains>
+fftw_plan
+makeFftwInverse(Fits::Raster<typename TDomains::Value, 3>& image, Fits::Raster<typename TDomains::Coef, 3>& coefs);
+
+template <typename TDomains>
+long coefsWidth(long imageWidth);
 
 } // namespace Internal
 
@@ -133,60 +93,37 @@ fftw_plan makeFftwInversePlan(Fits::Raster<double, 3>& image, Fits::Raster<std::
  * 
  * In addition, several images of identical shapes can be transformed at once,
  * by instantiating a single DFT through the `count` parameter.
- * 
- * For example, here is the convolution of two images read from a Fits file:
- * 
- * \code
- * // Initialize DFT object for 2 images
- * RealDft dft(shape, 2); // Allocate memory for space and frequency domains
- * 
- * // Read image
- * Fits::MefFile f(filename, FileMode::Read); // Open file
- * f.access<Fits::ImageRaster>(0).readTo(dft.space(0)); // Read first image in place
- * f.access<Fits::ImageRaster>(1).readTo(dft.space(1)); // Read second image in place
- * 
- * // Fourier transform (in-place)
- * dft.transform(); // Evaluate frequency-domain data
- * auto& freq0 = dft.frequency(0);
- * auto& freq1 = dft.frequency(1);
- * 
- * // Perform convolution (frequency-domain multiplication into freq0)
- * std::transform(freq0.begin(), freq0.end(), freq1.begin(), freq0.end(), std::multiply<>());
- * 
- * // Inverse Fourier transform (in-place, overwrites space-domain data)
- * dft.inverse(); // FIXME computes two transforms
- * const auto& convolved = dft.space(0);
- * \endcode
  */
-class RealDft {
+template <typename TDomains>
+class Dft {
 
 public:
   /**
    * @brief The image value type.
    */
-  using Value = double;
+  using Value = typename TDomains::Value;
 
   /**
    * @brief The Fourier coefficient type.
    */
-  using Coefficient = std::complex<Value>;
+  using Coef = typename TDomains::Coef;
 
   /**
    * @brief Constructor.
    * @param shape The shape of each input image
    * @param count The number of input images
    */
-  RealDft(Fits::Position<2> shape, long count = 1) :
-      m_width {shape[0]}, m_halfWidth {m_width / 2 + 1}, m_height {shape[1]}, m_count {count},
+  Dft(Fits::Position<2> shape, long count = 1) :
+      m_width {shape[0]}, m_coefsWidth {Internal::coefsWidth<TDomains>(m_width)}, m_height {shape[1]}, m_count {count},
       m_image {Internal::makeFftwRaster<Value>(m_width, m_height, m_count)},
-      m_coefs {Internal::makeFftwRaster<Coefficient>(m_halfWidth, m_height, m_count)},
-      m_transform {Internal::makeFftwTransformPlan(m_image, m_coefs)},
-      m_inverse {Internal::makeFftwInversePlan(m_image, m_coefs)} {}
+      m_coefs {Internal::makeFftwRaster<Coef>(m_coefsWidth, m_height, m_count)},
+      m_transform {Internal::makeFftwTransform<TDomains>(m_image, m_coefs)},
+      m_inverse {Internal::makeFftwInverse<TDomains>(m_image, m_coefs)} {}
 
   /**
    * @brief Destructor.
    */
-  ~RealDft() {
+  ~Dft() {
     fftw_free(m_image.data());
     fftw_free(m_coefs.data());
     fftw_destroy_plan(m_transform);
@@ -210,14 +147,14 @@ public:
   /**
    * @brief Access the Fourier coefficients.
    */
-  const Fits::PtrRaster<const Coefficient> coefficients(long index = 0) const {
+  const Fits::PtrRaster<const Coef> coefs(long index = 0) const {
     return m_coefs.section(index);
   }
 
   /**
-   * @copydoc coefficients()
+   * @copydoc coefs()
    */
-  Fits::PtrRaster<Coefficient> coefficients(long index = 0) {
+  Fits::PtrRaster<Coef> coefs(long index = 0) {
     return m_coefs.section(index);
   }
 
@@ -258,18 +195,18 @@ public:
    * as the computed conjugates are redundant and therefore not needed for further computations.
    * Expect no optimization efforts in its implementation.
    */
-  Fits::VecRaster<Coefficient> evalConjugates(long index = 0) {
-    Fits::VecRaster<Coefficient> res({m_width, m_height});
-    const auto coefs = coefficients(index);
-    for (const auto& p : coefs.domain()) {
-      res[p] = coefs[p];
+  Fits::VecRaster<Coef> evalConjugates(long index = 0) { // FIXME not for ComplexToComplex
+    Fits::VecRaster<Coef> res({m_width, m_height});
+    const auto dft = coefs(index);
+    for (const auto& p : dft.domain()) {
+      res[p] = dft[p];
     }
-    Fits::Region<2> right {{m_halfWidth, 0}, {m_width - 1, m_height - 1}};
+    Fits::Region<2> right {{m_coefsWidth, 0}, {m_width - 1, m_height - 1}};
     Fits::Position<2> q;
     for (const auto& p : right) {
       q[0] = m_width - p[0] - 1;
       q[1] = m_height - p[1] - 1;
-      res[p] = std::conj(coefs[q]);
+      res[p] = std::conj(dft[q]);
     }
     return res;
   }
@@ -279,11 +216,11 @@ public:
    * @details
    * Coefficients are shifted by `width / 2` and `height / 2`, respectively.
    */
-  Fits::VecRaster<Coefficient> centerEvalConjugates(long index = 0) {
-    const auto xShift = m_width - m_halfWidth;
+  Fits::VecRaster<Coef> centerEvalConjugates(long index = 0) { // FIXME not for ComplexToComplex
+    const auto xShift = m_width - m_coefsWidth;
     const auto yShift = m_height - (m_height / 2 + 1); // FIXME check and simplify
-    Fits::VecRaster<Coefficient> res({m_width, m_height});
-    const auto coefs = coefficients(index);
+    Fits::VecRaster<Coef> res({m_width, m_height});
+    const auto coefs = coefs(index);
     for (const auto& p : coefs.domain()) {
       Fits::Position<2> q = {(p[0] + xShift) % m_width, (p[1] + yShift) % m_height};
       res[q] = coefs[p];
@@ -294,9 +231,9 @@ public:
   }
 
 private:
-  long m_width, m_halfWidth, m_height, m_count;
+  long m_width, m_coefsWidth, m_height, m_count;
   Fits::PtrRaster<Value, 3> m_image;
-  Fits::PtrRaster<Coefficient, 3> m_coefs;
+  Fits::PtrRaster<Coef, 3> m_coefs;
   fftw_plan m_transform;
   fftw_plan m_inverse;
 };
@@ -304,8 +241,8 @@ private:
 /**
  * @brief Compute the Fourier coefficients magnitude.
  */
-Fits::VecRaster<RealDft::Value> evalMagnitude(const Fits::Raster<RealDft::Coefficient>& coefs) {
-  Fits::VecRaster<RealDft::Value> res(coefs.shape());
+Fits::VecRaster<double> evalMagnitude(const Fits::Raster<std::complex<double>>& coefs) {
+  Fits::VecRaster<double> res(coefs.shape());
   // std::transform(coefs.begin(), coefs.end(), res.begin(), [](auto c) {
   //   return std::norm(c);
   // });
@@ -314,6 +251,9 @@ Fits::VecRaster<RealDft::Value> evalMagnitude(const Fits::Raster<RealDft::Coeffi
   }
   return res;
 }
+
+using RealDft = Dft<RealToComplex>;
+using ComplexDft = Dft<ComplexToComplex>;
 
 } // namespace Fourier
 } // namespace Euclid

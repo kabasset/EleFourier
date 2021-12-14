@@ -14,7 +14,7 @@ elements_subdir(EleFourier)
 #         elements_depends_on_subdirs(ElementsKernel)
 #===============================================================================
 elements_depends_on_subdirs(ElementsKernel)
-elements_depends_on_subdirs(EleFits)
+elements_depends_on_subdirs(EleFits EleFitsUtils EleFitsValidation)
 
 #===============================================================================
 # Add the find_package macro (a pure CMake command) here to locate the
@@ -33,8 +33,8 @@ find_package(FFTW)
 #                     PUBLIC_HEADERS ElementsExamples)
 #===============================================================================
 elements_add_library(EleFourier src/lib/*.cpp
-                     INCLUDE_DIRS ElementsKernel EleFits FFTW
-                     LINK_LIBRARIES ElementsKernel EleFits FFTW
+                     INCLUDE_DIRS ElementsKernel EleFits EleFitsUtils EleFitsValidation FFTW
+                     LINK_LIBRARIES ElementsKernel EleFits EleFitsUtils EleFitsValidation FFTW
                      PUBLIC_HEADERS EleFourier)
 
 #===============================================================================
@@ -44,6 +44,8 @@ elements_add_library(EleFourier src/lib/*.cpp
 #                        INCLUDE_DIRS Boost ElementsExamples
 #                        LINK_LIBRARIES Boost ElementsExamples)
 #===============================================================================
+elements_add_executable(EleFourierTutorial src/program/EleFourierTutorial.cpp
+                     LINK_LIBRARIES EleFourier)
 
 #===============================================================================
 # Declare the Boost tests here
@@ -76,3 +78,4 @@ elements_add_unit_test(Dft tests/src/Dft_test.cpp
 # Examples:
 #          elements_install_conf_files()
 #===============================================================================
+elements_install_conf_files()

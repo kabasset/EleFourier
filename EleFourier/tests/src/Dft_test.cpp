@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(fftw_malloc_test) {
   checkFftwMalloc<std::complex<double>>(width / 2 + 1, height, count);
 }
 
-BOOST_AUTO_TEST_CASE(fftw_r2c_malloc_test) {
+BOOST_AUTO_TEST_CASE(fftw_real_malloc_test) {
   constexpr long width = 5;
   constexpr long height = 6;
   constexpr long count = 3;
@@ -62,8 +62,8 @@ BOOST_AUTO_TEST_CASE(fftw_r2c_malloc_test) {
     image[p] = 1 + p[0] + p[1] + p[2];
   }
   auto coefs = Internal::makeFftwRaster<std::complex<double>>(width / 2 + 1, height, count);
-  auto transform = Internal::makeFftwTransformPlan(image, coefs);
-  auto inverse = Internal::makeFftwInversePlan(image, coefs);
+  auto transform = Internal::makeFftwTransform<RealToComplex>(image, coefs);
+  auto inverse = Internal::makeFftwInverse<RealToComplex>(image, coefs);
   fftw_execute(transform); // Coefficients computed, image is junk
   fftw_execute(inverse); // Image recomputed, coefficients are junk
   fftw_destroy_plan(transform);
