@@ -18,35 +18,23 @@
 
 
 """
-:file: python/PyFFTPlayground/PyFFTPlaygroundTutorial.py
+:file: python/PyFFTPlayground/PyFFTWPlayground.py
 
 :date: 12/15/21
 :author: user
 
 """
 
+import sys
 import argparse
-import ElementsKernel.Logging as log
+import logging as log
+import multiprocessing
 import numpy as np
 from astropy.io import fits
-from scipy.fftpack import fft2, ifft2
-from PyFFTPlayground.Timer import Timer
+import pyfftw
+from scipy.fft import fft2, ifft2, set_backend
+from Timer import Timer
 from scipy import signal
-
-
-def defineSpecificProgramOptions():
-    """
-    @brief Allows to define the (command line and configuration file) options
-    specific to this program
-
-    @details See the Elements documentation for more details.
-    @return An  ArgumentParser.
-    """
-
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("input", type=str, help="Input fits file to process")
-
-    return parser
 
 
 def mainMethod(args):
@@ -55,12 +43,14 @@ def mainMethod(args):
     
     @details This method is the entry point to the program. In this sense, it is
     similar to a main (and it is why it is called mainMethod()).
+    Taken from pyFFTW example in https://github.com/pyFFTW/pyFFTW/issues/310#issuecomment-946342809
     """
 
-    logger = log.getLogger("PyFFTPlaygroundTutorial")
+    log.basicConfig(stream=sys.stdout, level=log.INFO)
+    logger = log.getLogger("PyFFTWPlayground")
 
     logger.info("#")
-    logger.info("# Entering PyFFTPlaygroundTutorial mainMethod()")
+    logger.info("# Entering PyFFTWPlayground mainMethod()")
     logger.info("#")
 
     t = Timer(logger=logger.info)
@@ -72,39 +62,55 @@ def mainMethod(args):
     t.stop()
 
     kernel_hdu = hdul[0].data.astype(np.float64)
-    kernel_shape = kernel_hdu.shape()
+    kernel_shape = kernel_hdu.shape
 
     kernel = pyfftw.empty_aligned(kernel_shape, dtype=np.float64)
     image = pyfftw.empty_aligned(kernel_shape, dtype=np.float64)
 
+    # Configure PyFFTW to use all cores (the default is single-threaded)
+    pyfftw.config.NUM_THREADS = multiprocessing.cpu_count()
+    pyfftw.config.PLANNER_EFFORT = "FFTW_MEASURE"
+
     logger.info("Applying DFT to all HDUs...")
     t.start()
-    transform = []
-    for hdu in hdul:
-        # Need to convert ndarray to np.float64
-        data = hdu.data.astype(np.float64)
-        transform.append(fft2(data))
+
+    kernel[:] = kernel_hdu
+    # Use the backend pyfftw.interfaces.scipy_fft
+    with set_backend(pyfftw.interfaces.scipy_fft):
+        # Turn on the cache for optimum performance
+        pyfftw.interfaces.cache.enable()
+
+        transform = []
+        for hdu in hdul:
+            # Copy in input buffers
+            image[:] = hdu.data.astype(np.float64)
+            data = hdu.data.astype(np.float64)
+            transform.append(fft2(image))
     t.stop()
 
     logger.info("Perform convolution using signal.fftconvolve...")
     t.start()
     conv = []
-    kernel = hdul[0].data.astype(np.float64)
-    for hdu in hdul[1:]:
-        data = hdu.data.astype(np.float64)
-        conv.append(signal.fftconvolve(data, kernel, mode="same"))
-    t.stop()
+    kernel[:] = kernel_hdu
 
-    logger.info("Applying inverse DFTs...")
-    t.start()
-    inverse = []
-    for hdu in hdul:
-        data = hdu.data.astype(np.float64)
-        inverse.append(ifft2(data))
+    with set_backend(pyfftw.interfaces.scipy_fft):
+        for hdu in hdul[1:]:
+            image[:] = hdu.data.astype(np.float64)
+            conv.append(signal.fftconvolve(image, kernel))
+
     t.stop()
 
     logger.info("#")
-    logger.info("# Exiting PyFFTPlaygroundTutorial mainMethod()")
+    logger.info("# Exiting PyFFTWPlayground mainMethod()")
     logger.info("#")
 
-    return Exit.Code["OK"]
+    return 0
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("input", type=str, help="Input fits file to process")
+
+    args = parser.parse_args()
+    mainMethod(args)
