@@ -71,12 +71,6 @@ def mainMethod(args):
     hdul = fits.open(input_file)
     t.stop()
 
-    kernel_hdu = hdul[0].data.astype(np.float64)
-    kernel_shape = kernel_hdu.shape()
-
-    kernel = pyfftw.empty_aligned(kernel_shape, dtype=np.float64)
-    image = pyfftw.empty_aligned(kernel_shape, dtype=np.float64)
-
     logger.info("Applying DFT to all HDUs...")
     t.start()
     transform = []
@@ -92,7 +86,7 @@ def mainMethod(args):
     kernel = hdul[0].data.astype(np.float64)
     for hdu in hdul[1:]:
         data = hdu.data.astype(np.float64)
-        conv.append(signal.fftconvolve(data, kernel, mode="same"))
+        conv.append(signal.fftconvolve(data, kernel))
     t.stop()
 
     logger.info("Applying inverse DFTs...")
