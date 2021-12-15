@@ -17,7 +17,6 @@
  *
  */
 
-#include "EleFits/MefFile.h" // FIXME rm
 #include "EleFourier/Dft.h"
 
 #include <boost/test/unit_test.hpp>
@@ -36,9 +35,7 @@ void checkFftwMalloc(long width, long height, long count) {
   auto raster = Internal::makeFftwRaster<T>(width, height, count);
   BOOST_TEST(raster.size() == width * height * count);
   BOOST_TEST(raster.data() != nullptr);
-  auto begin = raster.data();
-  auto end = begin + raster.size();
-  std::fill(begin, end, T(1));
+  std::fill(raster.begin(), raster.end(), T(1));
   for (const auto& p : raster.domain()) {
     BOOST_TEST(raster[p] == T(1));
   }
@@ -53,17 +50,17 @@ BOOST_AUTO_TEST_CASE(fftw_malloc_test) {
   checkFftwMalloc<std::complex<double>>(width / 2 + 1, height, count);
 }
 
-BOOST_AUTO_TEST_CASE(fftw_real_malloc_test) {
+BOOST_AUTO_TEST_CASE(fftw_r2c_c2r_test) {
   constexpr long width = 5;
   constexpr long height = 6;
   constexpr long count = 3;
   auto image = Internal::makeFftwRaster<double>(width, height, count);
-  for (const auto& p : image.domain()) {
-    image[p] = 1 + p[0] + p[1] + p[2];
-  }
   auto coefs = Internal::makeFftwRaster<std::complex<double>>(width / 2 + 1, height, count);
   auto transform = Internal::makeFftwTransform<RealToComplex>(image, coefs);
   auto inverse = Internal::makeFftwInverse<RealToComplex>(image, coefs);
+  for (const auto& p : image.domain()) {
+    image[p] = 1 + p[0] + p[1] + p[2];
+  }
   fftw_execute(transform); // Coefficients computed, image is junk
   fftw_execute(inverse); // Image recomputed, coefficients are junk
   fftw_destroy_plan(transform);
@@ -76,34 +73,6 @@ BOOST_AUTO_TEST_CASE(fftw_real_malloc_test) {
   }
   fftw_free(image.data());
   fftw_free(coefs.data());
-}
-
-BOOST_AUTO_TEST_CASE(example_test) {
-  Fits::Position<2> shape {30, 14};
-  RealDft dft(shape);
-  BOOST_TEST(dft.image().shape() == shape);
-  for (const auto& p : dft.image().domain()) {
-    dft.image()[p] = 1 + p[0] + 2 * p[1];
-  }
-  Fits::MefFile f("/tmp/dft.fits", Fits::FileMode::Overwrite);
-  printf("Writing image...\n");
-  f.assignImageExt("IN", dft.image());
-  printf("Transforming...\n");
-  dft.transform();
-  printf("Filling conjugates...\n");
-  const auto full = dft.evalConjugates();
-  printf("Writing magnitude...\n");
-  f.assignImageExt("OUT", evalMagnitude(full));
-  printf("Inverting...\n");
-  dft.inverse();
-  printf("Writing image...\n");
-  for (const auto& p : dft.image().domain()) {
-    const auto expected = dft.normalizationFactor() * (1 + p[0] + 2 * p[1]);
-    const auto value = dft.image()[p];
-    BOOST_TEST(value > 0.99 * expected);
-    BOOST_TEST(value < 1.01 * expected);
-  }
-  f.assignImageExt("IN2", dft.image());
 }
 
 //-----------------------------------------------------------------------------

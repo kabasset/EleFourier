@@ -221,20 +221,55 @@ public:
     const auto yShift = m_height - (m_height / 2 + 1); // FIXME check and simplify
     Fits::VecRaster<Coef> res({m_width, m_height});
     const auto coefs = coefs(index);
+    Fits::Position<2> q;
     for (const auto& p : coefs.domain()) {
-      Fits::Position<2> q = {(p[0] + xShift) % m_width, (p[1] + yShift) % m_height};
+      q = {(p[0] + xShift) % m_width, (p[1] + yShift) % m_height};
       res[q] = coefs[p];
-      Fits::Position<2> r = {(m_width - q[0]) % m_width, (m_height - q[1]) % m_height};
-      res[r] = std::conj(coefs[p]);
+      q = {(m_width - q[0]) % m_width, (m_height - q[1]) % m_height};
+      res[q] = std::conj(coefs[p]);
     }
     return res;
   }
 
 private:
-  long m_width, m_coefsWidth, m_height, m_count;
+  /**
+   * @brief The image width.
+   */
+  long m_width;
+
+  /**
+   * @brief The coefficients raster width.
+   */
+  long m_coefsWidth;
+
+  /**
+   * @brief The image and coefficients raster width.
+   */
+  long m_height;
+
+  /**
+   * @brief The number of images.
+   */
+  long m_count;
+
+  /**
+   * @brief The image stack.
+   */
   Fits::PtrRaster<Value, 3> m_image;
+
+  /**
+   * @brief The coefficients raster stack.
+   */
   Fits::PtrRaster<Coef, 3> m_coefs;
+
+  /**
+   * @brief The direct transform plan.
+   */
   fftw_plan m_transform;
+
+  /**
+   * @brief The inverse transform plan.
+   */
   fftw_plan m_inverse;
 };
 
@@ -243,12 +278,9 @@ private:
  */
 Fits::VecRaster<double> evalMagnitude(const Fits::Raster<std::complex<double>>& coefs) {
   Fits::VecRaster<double> res(coefs.shape());
-  // std::transform(coefs.begin(), coefs.end(), res.begin(), [](auto c) {
-  //   return std::norm(c);
-  // });
-  for (const auto& p : res.domain()) {
-    res[p] = std::norm(coefs[p]);
-  }
+  std::transform(coefs.begin(), coefs.end(), res.begin(), [](auto c) {
+    return std::norm(c);
+  });
   return res;
 }
 

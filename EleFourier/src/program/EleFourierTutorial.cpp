@@ -23,6 +23,7 @@
 #include "EleFourier/Dft.h"
 #include "ElementsKernel/ProgramHeaders.h"
 
+#include <chrono>
 #include <functional>
 #include <map>
 #include <string>
@@ -45,7 +46,7 @@ public:
 
     Elements::Logging logger = Elements::Logging::getLogger("EleFourierTutorial");
     const auto filename = args["filename"].as<std::string>();
-    Fits::Test::Chronometer<std::chrono::milliseconds> chrono;
+    Fits::Validation::Chronometer<std::chrono::milliseconds> chrono;
 
     // Open Fits file
     logger.info() << "Opening file: " << filename;
@@ -60,9 +61,13 @@ public:
     logger.info() << "  Done in " << chrono.last().count() << "ms";
 
     // Initialize DFT plans
-    logger.info() << "Initializing plans...";
+    logger.info() << "Initializing filter plan...";
     chrono.start();
     RealDft filter(shape);
+    chrono.stop();
+    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "Initializing image plans...";
+    chrono.start();
     RealDft images(shape, count);
     chrono.stop();
     logger.info() << "  Done in " << chrono.last().count() << "ms";
@@ -97,9 +102,7 @@ public:
     auto kernel = filter.coefs();
     for (long i = 0; i < count; ++i) {
       auto dft = images.coefs(i);
-      auto begin = dft.data();
-      auto end = begin + dft.size();
-      std::transform(begin, end, kernel.data(), begin, std::multiplies<>()); // FIXME dft.begin()/end()...
+      std::transform(dft.begin(), dft.end(), kernel.begin(), dft.begin(), std::multiplies<>());
     }
     chrono.stop();
     logger.info() << "  Done in " << chrono.last().count() << "ms";
