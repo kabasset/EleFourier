@@ -39,7 +39,7 @@ struct RealForwardDftType {
   using OutValue = std::complex<double>;
   using Inverse = RealBackwardDftType;
   static Fits::Position<2> outShape(const Fits::Position<2>& shape);
-  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& fourier);
+  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& out);
 };
 
 struct RealBackwardDftType {
@@ -47,7 +47,7 @@ struct RealBackwardDftType {
   using OutValue = double;
   using Inverse = RealForwardDftType;
   static Fits::Position<2> outShape(const Fits::Position<2>& shape);
-  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& fourier);
+  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& out);
 };
 
 struct ComplexForwardDftType {
@@ -55,7 +55,7 @@ struct ComplexForwardDftType {
   using OutValue = std::complex<double>;
   using Inverse = ComplexBackwardDftType;
   static Fits::Position<2> outShape(const Fits::Position<2>& shape);
-  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& fourier);
+  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& out);
 };
 
 struct ComplexBackwardDftType {
@@ -63,7 +63,7 @@ struct ComplexBackwardDftType {
   using OutValue = std::complex<double>;
   using Inverse = ComplexForwardDftType;
   static Fits::Position<2> outShape(const Fits::Position<2>& shape);
-  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& fourier);
+  static fftw_plan initFftwPlan(Fits::Raster<InValue, 3>& in, Fits::Raster<OutValue, 3>& out);
 };
 
 using RealForwardDft = TransformPlan<RealForwardDftType, false, false>;

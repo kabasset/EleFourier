@@ -76,16 +76,16 @@ public:
     auto imageInverseDft = imageDft.inverse();
     chrono.stop();
     logger.info() << "  Done in " << chrono.last().count() << "ms";
-    logger.info() << "Initializing dummy complex forward plan...";
-    chrono.start();
-    auto dummyDft = imageDft.compose<ComplexForwardDft>();
-    chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
-    logger.info() << "Initializing dummy complex backward plan...";
-    chrono.start();
-    auto dummyInverseDft = dummyDft.inverse();
-    chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    // logger.info() << "Initializing dummy complex forward plan..."; // FIXME shape
+    // chrono.start();
+    // auto dummyDft = imageDft.compose<ComplexForwardDft>();
+    // chrono.stop();
+    // logger.info() << "  Done in " << chrono.last().count() << "ms";
+    // logger.info() << "Initializing dummy complex backward plan...";
+    // chrono.start();
+    // auto dummyInverseDft = dummyDft.inverse();
+    // chrono.stop();
+    // logger.info() << "  Done in " << chrono.last().count() << "ms";
 
     // Read filter and images
     logger.info() << "Reading filter and images...";
@@ -111,17 +111,17 @@ public:
     chrono.stop();
     logger.info() << "  Done in " << chrono.last().count() << "ms";
 
-    // Dummy direct + inverse transforms for demonstration
-    logger.info() << "Applying DFT to dummy...";
-    chrono.start();
-    dummyDft.transform();
-    chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
-    logger.info() << "Applying normalized inverse DFT to dummy...";
-    chrono.start();
-    dummyInverseDft.transform().normalize();
-    chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    // Dummy direct + inverse transforms for demonstration // FIXME shape
+    // logger.info() << "Applying DFT to dummy...";
+    // chrono.start();
+    // dummyDft.transform();
+    // chrono.stop();
+    // logger.info() << "  Done in " << chrono.last().count() << "ms";
+    // logger.info() << "Applying normalized inverse DFT to dummy...";
+    // chrono.start();
+    // dummyInverseDft.transform().normalize();
+    // chrono.stop();
+    // logger.info() << "  Done in " << chrono.last().count() << "ms";
 
     // Perform convolution (frequency-domain multiplication into dft0 and dft1)
     logger.info() << "Convolving...";

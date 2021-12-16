@@ -20,6 +20,7 @@
 #include "EleFourier/Dft.h"
 
 #include <boost/test/unit_test.hpp>
+#include <type_traits>
 
 using namespace Euclid;
 using namespace Fourier;
@@ -30,11 +31,10 @@ BOOST_AUTO_TEST_SUITE(Dft_test)
 
 //-----------------------------------------------------------------------------
 
-/*
 template <typename T>
-void checkFftwMalloc(long width, long height, long count) {
-  auto raster = Internal::makeFftwRaster<T>(width, height, count);
-  BOOST_TEST(raster.size() == width * height * count);
+void checkFftwMalloc(const Fits::Position<2>& shape, long count) {
+  auto raster = RealForwardDft::initFftwBuffer<T, false>(shape, count, nullptr);
+  BOOST_TEST(raster.size() == shapeSize(shape) * count);
   BOOST_TEST(raster.data() != nullptr);
   std::fill(raster.begin(), raster.end(), T(1));
   for (const auto& p : raster.domain()) {
@@ -47,10 +47,23 @@ BOOST_AUTO_TEST_CASE(fftw_malloc_test) {
   constexpr long width = 3;
   constexpr long height = 14;
   constexpr long count = 2;
-  checkFftwMalloc<double>(width, height, count);
-  checkFftwMalloc<std::complex<double>>(width / 2 + 1, height, count);
+  checkFftwMalloc<double>({width, height}, count);
+  checkFftwMalloc<std::complex<double>>({width / 2 + 1, height}, count);
 }
 
+BOOST_AUTO_TEST_CASE(fftw_r2c_malloc_test) {
+  Fits::Position<2> shape {3, 4};
+  long count = 5;
+  auto in = RealForwardDft::initFftwBuffer<double, false>(shape, count, nullptr);
+  auto out = RealForwardDft::initFftwBuffer<std::complex<double>, false>(shape, count, nullptr);
+  auto plan = RealForwardDftType::initFftwPlan(in, out);
+  fftw_free(in.data());
+  fftw_free(out.data());
+  fftw_destroy_plan(plan);
+  fftw_cleanup();
+}
+
+/*
 BOOST_AUTO_TEST_CASE(fftw_r2c_c2r_test) {
   constexpr long width = 5;
   constexpr long height = 6;
@@ -77,6 +90,78 @@ BOOST_AUTO_TEST_CASE(fftw_r2c_c2r_test) {
 }
 */
 
+template <typename TTransform>
+void checkInit(const Fits::Position<2>& shape, long count) {
+  TransformPlan<typename TTransform::Type, false, false> plan(shape, count);
+  BOOST_TEST(plan.shape() == shape);
+  BOOST_TEST(plan.count() == count);
+  BOOST_TEST(plan.inShape() == TTransform::Type::Inverse::outShape(shape));
+  BOOST_TEST(plan.outShape() == TTransform::Type::outShape(shape));
+  BOOST_TEST(plan.inBuffer().data() != nullptr);
+  BOOST_TEST(plan.outBuffer().data() != nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(init_test) {
+  const Fits::Position<2> shape {4, 3};
+  const long count = 10;
+  checkInit<RealForwardDft>(shape, count);
+  checkInit<RealBackwardDft>(shape, count);
+  checkInit<ComplexForwardDft>(shape, count);
+  checkInit<ComplexBackwardDft>(shape, count);
+}
+
+template <typename TTransform>
+void checkInverse(const Fits::Position<2>& shape, long count) {
+  TransformPlan<typename TTransform::Type, false, false> plan(shape, count);
+  auto inverse = plan.inverse();
+  using Expected = typename decltype(plan)::Type::Inverse;
+  using Inverse = typename decltype(inverse)::Type;
+  BOOST_TEST((std::is_same<Inverse, Expected>::value));
+  BOOST_TEST(inverse.shape() == shape);
+  BOOST_TEST(inverse.count() == count);
+  BOOST_TEST(inverse.inShape() == plan.outShape());
+  BOOST_TEST(inverse.outShape() == plan.inShape());
+  BOOST_TEST(inverse.inBuffer().data() == plan.outBuffer().data());
+  BOOST_TEST(inverse.outBuffer().data() == plan.inBuffer().data());
+}
+
+BOOST_AUTO_TEST_CASE(inverse_test) {
+  const Fits::Position<2> shape {4, 3};
+  const long count = 10;
+  checkInverse<RealForwardDft>(shape, count);
+  checkInverse<RealBackwardDft>(shape, count);
+  checkInverse<ComplexForwardDft>(shape, count);
+  checkInverse<ComplexBackwardDft>(shape, count);
+}
+
+template <typename TTransform, typename UTransform>
+void checkComposition() {
+  const Fits::Position<2> shape {4, 3};
+  const long count = 10;
+  TransformPlan<typename TTransform::Type, false, false> plan(shape, count);
+  auto composed = plan.template compose<UTransform>();
+  BOOST_TEST(composed.shape() == shape);
+  BOOST_TEST(composed.count() == count);
+  BOOST_TEST(composed.inShape() == plan.outShape());
+  BOOST_TEST(composed.inBuffer().data() == plan.outBuffer().data());
+  BOOST_TEST(composed.outBuffer().data() != nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(real_composition_test) {
+  checkComposition<RealForwardDft, RealBackwardDft>();
+  checkComposition<RealBackwardDft, RealForwardDft>();
+}
+
+BOOST_AUTO_TEST_CASE(real_complex_composition_test) {
+  checkComposition<RealForwardDft, ComplexForwardDft>();
+  checkComposition<ComplexBackwardDft, RealBackwardDft>();
+}
+
+BOOST_AUTO_TEST_CASE(complex_composition_test) {
+  checkComposition<ComplexForwardDft, ComplexBackwardDft>();
+  checkComposition<ComplexBackwardDft, ComplexForwardDft>();
+}
+
 BOOST_AUTO_TEST_CASE(dft_r2c_c2r_test) {
 
   // Initialize plans
@@ -100,15 +185,13 @@ BOOST_AUTO_TEST_CASE(dft_r2c_c2r_test) {
 
   // Check values are recovered
   for (long i = 0; i < count; ++i) {
-    auto signal0 = r2c.inBuffer(i);
-    auto signal1 = c2r.outBuffer(i);
-    BOOST_TEST(c2r.outBuffer(i).data() == signal0.data());
-    for (const auto& p : signal0.domain()) {
+    auto signal = r2c.inBuffer(i);
+    BOOST_TEST(c2r.outBuffer(i).data() == signal.data());
+    for (const auto& p : signal.domain()) {
       const auto expected = (1L + p[0] + p[1] + i) * r2c.normalizationFactor();
-      const auto value = signal0[p];
+      const auto value = signal[p];
       BOOST_TEST(value > 0.99 * expected);
       BOOST_TEST(value < 1.01 * expected);
-      BOOST_TEST(signal1[p] == value);
     }
   }
 }

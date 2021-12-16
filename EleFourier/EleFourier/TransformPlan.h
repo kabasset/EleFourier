@@ -113,8 +113,10 @@ private:
     assert(ShareOut == bool(outData));
   }
 
+public:
   template <typename T, bool share>
-  static Fits::PtrRaster<T, 3> initFftwBuffer(const Fits::Position<2>& shape, long count, T* data) {
+  static Fits::PtrRaster<T, 3>
+  initFftwBuffer(const Fits::Position<2>& shape, long count, T* data) { // FIXME move outside?
     T* d = data ? data : (T*)fftw_malloc(sizeof(T) * shapeSize(shape) * count);
     if (data) {
       printf("Data already allocated at %p\n", (void*)d);
@@ -122,6 +124,10 @@ private:
       printf("Allocated %li values at %p\n", shapeSize(shape) * count, (void*)d);
     }
     return {{shape[0], shape[1], count}, d};
+  }
+
+  static void freeGlobals() {
+    fftw_cleanup();
   }
 
 public:
@@ -147,7 +153,7 @@ public:
    * This plan (`planA` from the snippet) is the owner of the buffers, which will be freed by its destructor,
    * which means that the buffers of the inverse plan (`planB`) has the same life cycle.
    */
-  TransformPlan<typename TType::Inverse, true, true> inverse() {
+  TransformPlan<typename Type::Inverse, true, true> inverse() {
     return {m_shape, m_count, m_out.data(), m_in.data()};
   }
 
@@ -165,7 +171,11 @@ public:
    */
   template <typename TPlan>
   TransformPlan<typename TPlan::Type, true, false> compose() {
-    return {m_shape, m_count, m_out.data(), nullptr};
+    return {
+        m_shape,
+        m_count,
+        m_out.data(),
+        nullptr}; // FIXME not necessarily m_shape, e.g. RealForwardDft -> ComplexForwardDft
   }
 
   /**
@@ -184,6 +194,20 @@ public:
       printf("Freeing output: %p\n", (void*)m_out.data());
       fftw_free(m_out.data());
     }
+  }
+
+  /**
+   * @brief Get the number of planes.
+   */
+  long count() const {
+    return m_count;
+  }
+
+  /**
+   * @brief Get the logical plane shape.
+   */
+  const Fits::Position<2>& shape() const {
+    return m_shape;
   }
 
   /**
