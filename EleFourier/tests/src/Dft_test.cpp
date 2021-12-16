@@ -102,8 +102,9 @@ BOOST_AUTO_TEST_CASE(dft_r2c_c2r_test) {
   for (long i = 0; i < count; ++i) {
     auto signal0 = r2c.inBuffer(i);
     auto signal1 = c2r.outBuffer(i);
+    BOOST_TEST(c2r.outBuffer(i).data() == signal0.data());
     for (const auto& p : signal0.domain()) {
-      const auto expected = 1L + p[0] + p[1] + i;
+      const auto expected = (1L + p[0] + p[1] + i) * r2c.normalizationFactor();
       const auto value = signal0[p];
       BOOST_TEST(value > 0.99 * expected);
       BOOST_TEST(value < 1.01 * expected);

@@ -22,6 +22,7 @@
 
 #include "EleFitsData/Raster.h"
 
+#include <cassert>
 #include <fftw3.h>
 
 namespace Euclid {
@@ -107,7 +108,10 @@ private:
       m_shape {shape}, m_inShape {TType::Inverse::outShape(shape)}, m_outShape {TType::outShape(shape)},
       m_count {count}, m_in {initFftwBuffer<InValue, ShareIn>(m_inShape, m_count, inData)},
       m_out {initFftwBuffer<OutValue, ShareOut>(m_outShape, m_count, outData)},
-      m_plan {TType::initFftwPlan(m_in, m_out)} {}
+      m_plan {TType::initFftwPlan(m_in, m_out)} {
+    assert(ShareIn == bool(inData));
+    assert(ShareOut == bool(outData));
+  }
 
   template <typename T, bool share>
   static Fits::PtrRaster<T, 3> initFftwBuffer(const Fits::Position<2>& shape, long count, T* data) {
@@ -126,8 +130,10 @@ public:
    * @param shape The logical plane shape
    * @param count The number of planes
    */
-  TransformPlan(Fits::Position<2> shape, long count = 1) :
-      TransformPlan(shape, count, ShareIn ? m_in.data() : nullptr, ShareOut ? m_out.data() : nullptr) {}
+  TransformPlan(Fits::Position<2> shape, long count = 1) : TransformPlan(shape, count, nullptr, nullptr) {
+    assert(not ShareIn);
+    assert(not ShareOut);
+  }
 
   /**
    * @brief Create the inverse `TransformPlan` with shared buffers.
@@ -142,7 +148,7 @@ public:
    * which means that the buffers of the inverse plan (`planB`) has the same life cycle.
    */
   TransformPlan<typename TType::Inverse, true, true> inverse() {
-    return {m_shape, m_count, nullptr, nullptr};
+    return {m_shape, m_count, m_out.data(), m_in.data()};
   }
 
   /**

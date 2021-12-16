@@ -46,7 +46,7 @@ fftw_plan RealForwardDftType::initFftwPlan(Fits::Raster<double, 3>& in, Fits::Ra
   return fftw_plan_many_dft_r2c(
       2, // rank
       n, // n
-      in.shape()[2], // howmany
+      shape[2], // howmany
       reinterpret_cast<double*>(in.data()), // in
       nullptr, // inembed
       1, // istride

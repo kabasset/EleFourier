@@ -29,55 +29,6 @@
 namespace Euclid {
 namespace Fourier {
 
-struct ComplexToComplex {
-  using Value = std::complex<double>;
-  using Coefficient = std::complex<double>;
-};
-
-struct RealToComplex {
-  using Value = double;
-  using Coefficient = std::complex<double>;
-};
-
-namespace Internal {
-
-template <typename T>
-Fits::PtrRaster<T, 3> makeFftwRaster(long width, long height, long count, T* data = nullptr) {
-  T* d = data ? data : (T*)fftw_malloc(sizeof(T) * width * height * count);
-  if (data) {
-    printf("Data already allocated at %p\n", (void*)d);
-  } else {
-    printf("Allocated %li values at %p\n", width * height * count, (void*)d);
-  }
-  return {{width, height, count}, d};
-}
-
-template <typename TDomains>
-fftw_plan makeFftwTransform(
-    Fits::Raster<typename TDomains::Value, 3>& signal,
-    Fits::Raster<typename TDomains::Coefficient, 3>& fourier);
-
-template <typename TDomains>
-fftw_plan makeFftwInverse(
-    Fits::Raster<typename TDomains::Value, 3>& signal,
-    Fits::Raster<typename TDomains::Coefficient, 3>& fourier);
-
-template <typename TDomains>
-long fourierWidth(long signalWidth);
-
-} // namespace Internal
-
-/**
- * @brief Compute the Fourier coefficients magnitude.
- */
-Fits::VecRaster<double> evalMagnitude(const Fits::Raster<std::complex<double>>& coefficients) {
-  Fits::VecRaster<double> res(coefficients.shape());
-  std::transform(coefficients.begin(), coefficients.end(), res.begin(), [](auto c) {
-    return std::norm(c);
-  });
-  return res;
-}
-
 struct RealForwardDftType;
 struct RealBackwardDftType;
 struct ComplexForwardDftType;
