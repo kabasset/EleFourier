@@ -76,7 +76,7 @@ def mainMethod(args):
 
     kernel[:] = kernel_hdu
     # Use the backend pyfftw.interfaces.scipy_fft
-    with set_backend(pyfftw.interfaces.scipy_fft):
+    with set_backend(pyfftw.interfaces.scipy_fft, only=True):
         # Turn on the cache for optimum performance
         pyfftw.interfaces.cache.enable()
 
@@ -84,8 +84,8 @@ def mainMethod(args):
         for hdu in hdul:
             # Copy in input buffers
             image[:] = hdu.data.astype(np.float64)
-            data = hdu.data.astype(np.float64)
             transform.append(fft2(image))
+
     t.stop()
 
     logger.info("Perform convolution using signal.fftconvolve...")
@@ -93,7 +93,7 @@ def mainMethod(args):
     conv = []
     kernel[:] = kernel_hdu
 
-    with set_backend(pyfftw.interfaces.scipy_fft):
+    with set_backend(pyfftw.interfaces.scipy_fft, only=True):
         for hdu in hdul[1:]:
             image[:] = hdu.data.astype(np.float64)
             conv.append(signal.fftconvolve(image, kernel))
