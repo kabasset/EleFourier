@@ -59,6 +59,10 @@ elements_add_unit_test(Dft tests/src/Dft_test.cpp
                      EXECUTABLE EleFourier_Dft_test
                      LINK_LIBRARIES EleFourier
                      TYPE Boost)
+elements_add_unit_test(TransformPlan tests/src/TransformPlan_test.cpp 
+                     EXECUTABLE EleFourier_TransformPlan_test
+                     LINK_LIBRARIES EleFourier
+                     TYPE Boost)
 
 #===============================================================================
 # Use the following macro for python modules, scripts and aux files:
