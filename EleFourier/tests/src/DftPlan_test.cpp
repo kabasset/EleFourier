@@ -1,8 +1,4 @@
 /**
- * @file tests/src/TransformPlan_test.cpp
- * @date 12/16/21
- * @author user
- *
  * @copyright (C) 2012-2020 Euclid Science Ground Segment
  *
  * This library is free software; you can redistribute it and/or modify it under
@@ -21,24 +17,21 @@
  *
  */
 
+#include "EleFourier/DftPlan.h"
+
 #include <boost/test/unit_test.hpp>
 
-#include "EleFourier//TransformPlan.h"
+//-----------------------------------------------------------------------------
+
+BOOST_AUTO_TEST_SUITE(DftPlan_test)
 
 //-----------------------------------------------------------------------------
 
-BOOST_AUTO_TEST_SUITE (TransformPlan_test)
-
-//-----------------------------------------------------------------------------
-
-BOOST_AUTO_TEST_CASE( example_test ) {
+BOOST_AUTO_TEST_CASE(example_test) {
 
   BOOST_FAIL("!!!! Please implement your tests !!!!");
-
 }
 
 //-----------------------------------------------------------------------------
 
-BOOST_AUTO_TEST_SUITE_END ()
-
-
+BOOST_AUTO_TEST_SUITE_END()

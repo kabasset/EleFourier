@@ -63,12 +63,12 @@ public:
     // Initialize DFT plans
     logger.info() << "Initializing filter plan...";
     chrono.start();
-    RealForwardDft filterDft(shape);
+    RealDft filterDft(shape);
     chrono.stop();
     logger.info() << "  Done in " << chrono.last().count() << "ms";
     logger.info() << "Initializing image forward plan...";
     chrono.start();
-    RealForwardDft imageDft(shape, count);
+    RealDft imageDft(shape, count);
     chrono.stop();
     logger.info() << "  Done in " << chrono.last().count() << "ms";
     logger.info() << "Initializing image backward plan...";
@@ -78,7 +78,7 @@ public:
     logger.info() << "  Done in " << chrono.last().count() << "ms";
     // logger.info() << "Initializing dummy complex forward plan..."; // FIXME shape
     // chrono.start();
-    // auto dummyDft = imageDft.compose<ComplexForwardDft>();
+    // auto dummyDft = imageDft.compose<HermitianComplexDft>();
     // chrono.stop();
     // logger.info() << "  Done in " << chrono.last().count() << "ms";
     // logger.info() << "Initializing dummy complex backward plan...";

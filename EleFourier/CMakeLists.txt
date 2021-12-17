@@ -59,8 +59,12 @@ elements_add_unit_test(Dft tests/src/Dft_test.cpp
                      EXECUTABLE EleFourier_Dft_test
                      LINK_LIBRARIES EleFourier
                      TYPE Boost)
-elements_add_unit_test(TransformPlan tests/src/TransformPlan_test.cpp 
-                     EXECUTABLE EleFourier_TransformPlan_test
+elements_add_unit_test(DftPlan tests/src/DftPlan_test.cpp 
+                     EXECUTABLE EleFourier_DftPlan_test
+                     LINK_LIBRARIES EleFourier
+                     TYPE Boost)
+elements_add_unit_test(DftType tests/src/DftType_test.cpp 
+                     EXECUTABLE EleFourier_DftType_test
                      LINK_LIBRARIES EleFourier
                      TYPE Boost)
 

@@ -1,8 +1,4 @@
 /**
- * @file src/lib/TransformPlan.cpp
- * @date 12/16/21
- * @author user
- *
  * @copyright (C) 2012-2020 Euclid Science Ground Segment
  *
  * This library is free software; you can redistribute it and/or modify it under
@@ -21,12 +17,4 @@
  *
  */
 
-#include "EleFourier/TransformPlan.h"
-
-namespace EleFourier {
-
-
-}  // namespace EleFourier
-
-
-
+#include "EleFourier/DftPlan.h"

@@ -17,22 +17,21 @@
  *
  */
 
-#ifndef _ELEFOURIER_TRANSFORMPLAN_H
-#define _ELEFOURIER_TRANSFORMPLAN_H
+#ifndef _ELEFOURIER_DFTPLAN_H
+#define _ELEFOURIER_DFTPLAN_H
 
-#include "EleFitsData/Raster.h"
+#include "EleFourier/DftType.h"
 
 #include <cassert>
-#include <fftw3.h>
 
 namespace Euclid {
 namespace Fourier {
 
 /**
- * @brief Singleton class to be instantiated by FFTW user class constructors
+ * @brief Singleton class to be instantiated by FFTW user classes (e.g. in constructor or destructor)
  * to ensure proper cleanup at program ending.
  * @details
- * The destructor, which is executed once, at the end of the program, calls `fftw_cleanup()`.
+ * The destructor, which is executed once (at the end of the program), calls `fftw_cleanup()`.
  */
 class FftwGlobalsCleaner {
 private:
@@ -54,11 +53,29 @@ public:
   /**
    * @brief Instantiate the singleton, to trigger cleanup at destruction.
    */
-  static FftwGlobalsCleaner& instance() {
+  static FftwGlobalsCleaner& instantiate() {
     static FftwGlobalsCleaner instance;
     return instance;
   }
 };
+
+/**
+ * @brief Initialize a FFTW buffer.
+ * @warning
+ * Data should be freed with `fftw_free()`.
+ */
+template <typename T, bool SharesData>
+Fits::PtrRaster<T, 3> initFftwBuffer(const Fits::Position<2>& shape, long count, T* data) {
+  // Assert that data is nullptr if and only if shared
+  assert(bool(data) == SharesData);
+  T* d = SharesData ? data : (T*)fftw_malloc(sizeof(T) * shapeSize(shape) * count);
+  if (SharesData) {
+    printf("Data already allocated at %p\n", (void*)d);
+  } else {
+    printf("Allocated %li values at %p\n", shapeSize(shape) * count, (void*)d);
+  }
+  return {{shape[0], shape[1], count}, d};
+}
 
 /**
  * @brief Memory- and computation-efficient discrete Fourier transform.
@@ -107,10 +124,10 @@ public:
  * - None of the transforms are scaled, which means that a factor `width * height` is introduced
  *   by calling `transform()` and then `inverse().transform()` - `normalize()` performs normalization on request.
  */
-template <typename TType, bool ShareIn, bool ShareOut>
-class TransformPlan {
+template <typename TType, bool SharesIn = false, bool SharesOut = false>
+class DftPlan { // FIXME rename as FftwPlan
   template <typename, bool, bool>
-  friend class TransformPlan;
+  friend class DftPlan;
 
 public:
   /**
@@ -119,14 +136,24 @@ public:
   using Type = TType;
 
   /**
+   * @brief The inverse plan type.
+   */
+  using InverseType = typename Type::InverseType;
+
+  /**
+   * @brief The inverse plan.
+   */
+  using InversePlan = DftPlan<InverseType>;
+
+  /**
    * @brief The signal value type.
    */
-  using InValue = typename TType::InValue;
+  using InValue = typename Type::InValue;
 
   /**
    * @brief The Fourier coefficient type.
    */
-  using OutValue = typename TType::OutValue;
+  using OutValue = typename Type::OutValue;
 
 private:
   /**
@@ -136,31 +163,11 @@ private:
    * @param inData The pre-existing input buffer, or `nullptr` to allocate a new one
    * @param outData The pre-existing output buffer, or `nullptr` to allocate a new one
    */
-  TransformPlan(Fits::Position<2> shape, long count, InValue* inData, OutValue* outData) :
-      m_shape {shape}, m_inShape {TType::Inverse::outShape(shape)}, m_outShape {TType::outShape(shape)},
-      m_count {count}, m_in {initFftwBuffer<InValue, ShareIn>(m_inShape, m_count, inData)},
-      m_out {initFftwBuffer<OutValue, ShareOut>(m_outShape, m_count, outData)},
-      m_plan {TType::initFftwPlan(m_in, m_out)} {
-    assert(ShareIn == bool(inData));
-    assert(ShareOut == bool(outData));
-  }
-
-public:
-  template <typename T, bool share>
-  static Fits::PtrRaster<T, 3>
-  initFftwBuffer(const Fits::Position<2>& shape, long count, T* data) { // FIXME move outside?
-    T* d = data ? data : (T*)fftw_malloc(sizeof(T) * shapeSize(shape) * count);
-    if (data) {
-      printf("Data already allocated at %p\n", (void*)d);
-    } else {
-      printf("Allocated %li values at %p\n", shapeSize(shape) * count, (void*)d);
-    }
-    return {{shape[0], shape[1], count}, d};
-  }
-
-  static void freeGlobals() {
-    fftw_cleanup();
-  }
+  DftPlan(Fits::Position<2> shape, long count, InValue* inData, OutValue* outData) :
+      m_shape {shape}, m_inShape {Type::inShape(shape)}, m_outShape {Type::outShape(shape)}, m_count {count},
+      m_in {initFftwBuffer<InValue, SharesIn>(m_inShape, m_count, inData)},
+      m_out {initFftwBuffer<OutValue, SharesOut>(m_outShape, m_count, outData)},
+      m_plan {initFftwPlan<Type>(m_in, m_out)} {}
 
 public:
   /**
@@ -168,13 +175,13 @@ public:
    * @param shape The logical plane shape
    * @param count The number of planes
    */
-  TransformPlan(Fits::Position<2> shape, long count = 1) : TransformPlan(shape, count, nullptr, nullptr) {
-    assert(not ShareIn);
-    assert(not ShareOut);
+  DftPlan(Fits::Position<2> shape, long count = 1) : DftPlan(shape, count, nullptr, nullptr) {
+    assert(not SharesIn);
+    assert(not SharesOut);
   }
 
   /**
-   * @brief Create the inverse `TransformPlan` with shared buffers.
+   * @brief Create the inverse `DftPlan` with shared buffers.
    * @details
    * \code
    * auto planB = planA.inverse();
@@ -185,12 +192,12 @@ public:
    * This plan (`planA` from the snippet) is the owner of the buffers, which will be freed by its destructor,
    * which means that the buffers of the inverse plan (`planB`) has the same life cycle.
    */
-  TransformPlan<typename Type::Inverse, true, true> inverse() {
+  DftPlan<InverseType, true, true> inverse() {
     return {m_shape, m_count, m_out.data(), m_in.data()};
   }
 
   /**
-   * @brief Create a `TransformPlan` which shares its input buffer with this `TransformPlan`'s output buffer.
+   * @brief Create a `DftPlan` which shares its input buffer with this `DftPlan`'s output buffer.
    * @details
    * \code
    * auto planB = planA.compose<ComplexForwardDft>();
@@ -202,7 +209,7 @@ public:
    * which means that the input buffer of the composed plan (`planB`) has the same life cycle.
    */
   template <typename TPlan>
-  TransformPlan<typename TPlan::Type, true, false> compose() {
+  DftPlan<typename TPlan::Type, true, false> compose() {
     return {
         m_shape,
         m_count,
@@ -214,19 +221,19 @@ public:
    * @brief Destructor.
    * @warning
    * Buffers are freed.
-   * If data has to outlive the `TransformPlan` object, buffers should be copied beforehand.
+   * If data has to outlive the `DftPlan` object, buffers should be copied beforehand.
    */
-  ~TransformPlan() {
+  ~DftPlan() {
     fftw_destroy_plan(m_plan);
-    if (not ShareIn) {
+    if (not SharesIn) {
       printf("Freeing input at: %p\n", (void*)m_in.data());
       fftw_free(m_in.data());
     }
-    if (not ShareOut) {
+    if (not SharesOut) {
       printf("Freeing output: %p\n", (void*)m_out.data());
       fftw_free(m_out.data());
     }
-    FftwGlobalsCleaner::instance();
+    FftwGlobalsCleaner::instantiate();
   }
 
   /**
@@ -297,7 +304,7 @@ public:
   /**
    * @brief Compute the transform.
    */
-  TransformPlan& transform() {
+  DftPlan& transform() {
     fftw_execute(m_plan);
     return *this;
   }
@@ -305,7 +312,7 @@ public:
   /**
    * @brief Divide by the output buffer by the normalization factor.
    */
-  TransformPlan& normalize() {
+  DftPlan& normalize() {
     const auto factor = normalizationFactor();
     for (auto& c : m_in) {
       c /= factor;
@@ -349,6 +356,16 @@ private:
    */
   fftw_plan m_plan;
 };
+
+/**
+ * @brief Inverse of a DFT plan.
+ * @details
+ * This is the DFT plan of the inverse type.
+ */
+// template <typename TType>
+// struct Inverse<DftPlan<TType, false, false>> : public DftPlan<Inverse<TType>, false, false> {
+//   Inverse(Fits::Position<2> shape, long count = 1) : DftPlan<Inverse<TType>, false, false>(shape, count) {}
+// };
 
 } // namespace Fourier
 } // namespace Euclid

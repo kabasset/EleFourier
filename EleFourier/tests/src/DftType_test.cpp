@@ -1,4 +1,8 @@
 /**
+ * @file tests/src/DftType_test.cpp
+ * @date 12/17/21
+ * @author user
+ *
  * @copyright (C) 2012-2020 Euclid Science Ground Segment
  *
  * This library is free software; you can redistribute it and/or modify it under
@@ -17,30 +21,24 @@
  *
  */
 
-#ifndef _ELEFOURIER_DFT_H
-#define _ELEFOURIER_DFT_H
+#include <boost/test/unit_test.hpp>
 
-#include "EleFourier/DftPlan.h"
+#include "EleFourier//DftType.h"
 
-namespace Euclid {
-namespace Fourier {
+//-----------------------------------------------------------------------------
 
-/**
- * @brief Real DFT plan.
- */
-using RealDft = DftPlan<RealDftType>;
+BOOST_AUTO_TEST_SUITE (DftType_test)
 
-/**
- * @brief Complex DFT plan.
- */
-using ComplexDft = DftPlan<ComplexDftType>;
+//-----------------------------------------------------------------------------
 
-/**
- * @brief Complex DFT plan with Hermitian symmetry.
- */
-using HermitianComplexDft = DftPlan<HermitianComplexDftType>;
+BOOST_AUTO_TEST_CASE( example_test ) {
 
-} // namespace Fourier
-} // namespace Euclid
+  BOOST_FAIL("!!!! Please implement your tests !!!!");
 
-#endif
+}
+
+//-----------------------------------------------------------------------------
+
+BOOST_AUTO_TEST_SUITE_END ()
+
+
