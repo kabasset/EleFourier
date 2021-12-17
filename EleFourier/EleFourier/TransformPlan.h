@@ -29,6 +29,38 @@ namespace Euclid {
 namespace Fourier {
 
 /**
+ * @brief Singleton class to be instantiated by FFTW user class constructors
+ * to ensure proper cleanup at program ending.
+ * @details
+ * The destructor, which is executed once, at the end of the program, calls `fftw_cleanup()`.
+ */
+class FftwGlobalsCleaner {
+private:
+  /**
+   * @brief Private constructor.
+   */
+  FftwGlobalsCleaner() {}
+
+public:
+  /**
+   * @brief Destructor.
+   * @details
+   * Frees FFTW's globals.
+   */
+  ~FftwGlobalsCleaner() {
+    fftw_cleanup();
+  }
+
+  /**
+   * @brief Instantiate the singleton, to trigger cleanup at destruction.
+   */
+  static FftwGlobalsCleaner& instance() {
+    static FftwGlobalsCleaner instance;
+    return instance;
+  }
+};
+
+/**
  * @brief Memory- and computation-efficient discrete Fourier transform.
  * 
  * @details
@@ -194,6 +226,7 @@ public:
       printf("Freeing output: %p\n", (void*)m_out.data());
       fftw_free(m_out.data());
     }
+    FftwGlobalsCleaner::instance();
   }
 
   /**
