@@ -17,30 +17,4 @@
  *
  */
 
-#ifndef _ELEFOURIER_DFT_H
-#define _ELEFOURIER_DFT_H
-
 #include "EleFourier/DftPlan.h"
-
-namespace Euclid {
-namespace Fourier {
-
-/**
- * @brief Real DFT plan.
- */
-using RealDft = DftPlan<RealDftType>;
-
-/**
- * @brief Complex DFT plan.
- */
-using ComplexDft = DftPlan<ComplexDftType>;
-
-/**
- * @brief Complex DFT plan with Hermitian symmetry.
- */
-using HermitianComplexDft = DftPlan<HermitianComplexDftType>;
-
-} // namespace Fourier
-} // namespace Euclid
-
-#endif

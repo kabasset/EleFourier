@@ -58,69 +58,106 @@ public:
     chrono.stop();
     logger.info() << "  Image size: " << shape[0] << "x" << shape[1];
     logger.info() << "  Image count: " << count;
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
 
     // Initialize DFT plans
     logger.info() << "Initializing filter plan...";
     chrono.start();
-    RealDft filter(shape);
+    RealDft filterDft(shape);
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
-    logger.info() << "Initializing image plans...";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+    logger.info() << "Initializing image forward plan...";
     chrono.start();
-    RealDft images(shape, count);
+    RealDft imageDft(shape, count);
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+    logger.info() << "Initializing image backward plan...";
+    chrono.start();
+    auto imageInverseDft = imageDft.inverse();
+    chrono.stop();
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+    logger.info() << "Initializing dummy complex forward plan..."; // FIXME shape
+    chrono.start();
+    auto dummyDft = imageDft.compose<ComplexDft>(imageDft.outShape());
+    chrono.stop();
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+    logger.info() << "Initializing dummy complex backward plan...";
+    chrono.start();
+    auto dummyInverseDft = dummyDft.inverse();
+    chrono.stop();
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
 
     // Read filter and images
     logger.info() << "Reading filter and images...";
     chrono.start();
-    auto tempImage = filter.image();
-    primary.readTo(tempImage);
+    auto lvalueRaster = filterDft.inBuffer(); // We cannot readTo() rvalues
+    primary.readTo(lvalueRaster);
     for (long i = 0; i < count; ++i) {
-      tempImage = images.image(i);
-      f.access<Fits::ImageHdu>(i + 1).raster().readTo(tempImage); // FIXME access<ImageRaster>()
+      lvalueRaster = imageDft.inBuffer(i);
+      f.access<Fits::ImageHdu>(i + 1).raster().readTo(lvalueRaster); // FIXME access<ImageRaster>()
     }
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
 
     // Fourier transform
     logger.info() << "Applying DFT to filter...";
     chrono.start();
-    filter.transform();
+    filterDft.transform();
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
     logger.info() << "Applying DFT to images...";
     chrono.start();
-    images.transform();
+    imageDft.transform();
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+
+    // Dummy direct + inverse transforms for demonstration
+    logger.info() << "Applying dummy complex DFT...";
+    chrono.start();
+    dummyDft.transform();
+    chrono.stop();
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+    logger.info() << "Applying normalized inverse dummy complex DFT...";
+    chrono.start();
+    dummyInverseDft.transform();
+    chrono.stop();
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+    logger.info() << "Normalizing...";
+    chrono.start();
+    dummyInverseDft.normalize();
+    chrono.stop();
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
 
     // Perform convolution (frequency-domain multiplication into dft0 and dft1)
     logger.info() << "Convolving...";
     chrono.start();
-    auto kernel = filter.coefs();
+    auto filterCoefficients = filterDft.outBuffer();
     for (long i = 0; i < count; ++i) {
-      auto dft = images.coefs(i);
-      std::transform(dft.begin(), dft.end(), kernel.begin(), dft.begin(), std::multiplies<>());
+      auto out = imageDft.outBuffer(i);
+      std::transform(out.begin(), out.end(), filterCoefficients.begin(), out.begin(), std::multiplies<>());
     }
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
 
     // Inverse Fourier transform (in-place, overwrites space-domain data)
     logger.info() << "Applying inverse DFTs...";
     chrono.start();
-    images.inverse();
+    imageInverseDft.transform();
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
+    logger.info() << "Normalizing...";
+    chrono.start();
+    imageInverseDft.normalize();
+    chrono.stop();
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
 
     logger.info() << "Writing images...";
     chrono.start();
     for (long i = 0; i < count; ++i) {
-      f.access<Fits::ImageHdu>(i + 1).raster().write(images.image(i));
+      f.access<Fits::ImageHdu>(i + 1).raster().write(imageDft.inBuffer(i)); // = imageInverseDft.outBuffer()
     }
     chrono.stop();
-    logger.info() << "  Done in " << chrono.last().count() << "ms";
+    logger.info() << "  Done in: " << chrono.last().count() << "ms";
 
     return Elements::ExitCode::OK;
   }

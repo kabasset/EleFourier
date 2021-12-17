@@ -17,30 +17,21 @@
  *
  */
 
-#ifndef _ELEFOURIER_DFT_H
-#define _ELEFOURIER_DFT_H
-
 #include "EleFourier/DftPlan.h"
 
-namespace Euclid {
-namespace Fourier {
+#include <boost/test/unit_test.hpp>
 
-/**
- * @brief Real DFT plan.
- */
-using RealDft = DftPlan<RealDftType>;
+//-----------------------------------------------------------------------------
 
-/**
- * @brief Complex DFT plan.
- */
-using ComplexDft = DftPlan<ComplexDftType>;
+BOOST_AUTO_TEST_SUITE(DftPlan_test)
 
-/**
- * @brief Complex DFT plan with Hermitian symmetry.
- */
-using HermitianComplexDft = DftPlan<HermitianComplexDftType>;
+//-----------------------------------------------------------------------------
 
-} // namespace Fourier
-} // namespace Euclid
+BOOST_AUTO_TEST_CASE(example_test) {
 
-#endif
+  BOOST_FAIL("!!!! Please implement your tests !!!!");
+}
+
+//-----------------------------------------------------------------------------
+
+BOOST_AUTO_TEST_SUITE_END()
