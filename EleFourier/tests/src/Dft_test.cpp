@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(fftw_r2c_c2r_test) {
 template <typename TPlan>
 void checkInit(const Fits::Position<2>& shape, long count) {
   TPlan plan(shape, count);
-  BOOST_TEST(plan.shape() == shape);
+  BOOST_TEST(plan.logicalShape() == shape);
   BOOST_TEST(plan.count() == count);
   BOOST_TEST(plan.inShape() == TPlan::InverseType::outShape(shape));
   BOOST_TEST(plan.outShape() == TPlan::Type::outShape(shape));
@@ -117,7 +117,7 @@ void checkInverse(const Fits::Position<2>& shape, long count) {
   using Expected = typename decltype(plan)::InverseType;
   using Inverse = typename decltype(inverse)::Type;
   BOOST_TEST((std::is_same<Inverse, Expected>::value));
-  BOOST_TEST(inverse.shape() == shape);
+  BOOST_TEST(inverse.logicalShape() == shape);
   BOOST_TEST(inverse.count() == count);
   BOOST_TEST(inverse.inShape() == plan.outShape());
   BOOST_TEST(inverse.outShape() == plan.inShape());
@@ -139,27 +139,32 @@ void checkComposition() {
   const Fits::Position<2> shape {4, 3};
   const long count = 10;
   DftPlan<typename TPlan::Type, false, false> plan(shape, count);
-  auto composed = plan.template compose<UPlan>();
-  BOOST_TEST(composed.shape() == shape);
+  auto composed = plan.template compose<UPlan>(shape);
+  BOOST_TEST(composed.logicalShape() == shape);
   BOOST_TEST(composed.count() == count);
   BOOST_TEST(composed.inShape() == plan.outShape());
   BOOST_TEST(composed.inBuffer().data() == plan.outBuffer().data());
   BOOST_TEST(composed.outBuffer().data() != nullptr);
 }
 
-BOOST_AUTO_TEST_CASE(real_composition_test) {
+BOOST_AUTO_TEST_CASE(real_inverse_composition_test) {
   checkComposition<RealDft, RealDft::InversePlan>();
   checkComposition<RealDft::InversePlan, RealDft>();
 }
 
-BOOST_AUTO_TEST_CASE(real_complex_composition_test) {
-  checkComposition<RealDft, HermitianComplexDft>();
-  checkComposition<HermitianComplexDft::InversePlan, RealDft::InversePlan>();
-}
+// BOOST_AUTO_TEST_CASE(real_complex_composition_test) {
+//   checkComposition<RealDft, HermitianComplexDft>();
+//   checkComposition<HermitianComplexDft::InversePlan, RealDft::InversePlan>();
+// }
 
-BOOST_AUTO_TEST_CASE(complex_composition_test) {
+BOOST_AUTO_TEST_CASE(complex_inverse_composition_test) {
   checkComposition<ComplexDft, ComplexDft::InversePlan>();
   checkComposition<ComplexDft::InversePlan, ComplexDft>();
+}
+
+BOOST_AUTO_TEST_CASE(complex_complex_composition_test) {
+  checkComposition<ComplexDft, ComplexDft>();
+  checkComposition<ComplexDft::InversePlan, ComplexDft::InversePlan>();
 }
 
 BOOST_AUTO_TEST_CASE(dft_r2c_c2r_test) {
@@ -213,7 +218,7 @@ BOOST_AUTO_TEST_CASE(dft_c2c_test) {
   }
 
   // Apply and then inverse
-  c2c.apply();
+  c2c.transform();
   c2c.inverseNormalize();
 
   // Check values are recovered
@@ -229,18 +234,21 @@ BOOST_AUTO_TEST_CASE(dft_c2c_test) {
     }
   }
 }
+*/
 
 BOOST_AUTO_TEST_CASE(dft_r2c_c2c_c2r_test) {
   // Initialize plans
   constexpr long width = 5;
   constexpr long height = 6;
   constexpr long count = 3;
-  RealDft r2c({width, height}, count);
-  auto c2c = r2c.compose();
-  
+  RealDft real({width, height}, count);
+  auto inverseReal = real.inverse();
+  auto complex = real.template compose<ComplexDftType>(real.outShape());
+  auto inverseComplex = complex.inverse();
+
   // Fill r2c signal
   for (long i = 0; i < count; ++i) {
-    auto signal = r2c.signal(i);
+    auto signal = real.inBuffer(i);
     for (const auto& p : signal.domain()) {
       signal[p] = 1 + p[0] + p[1] + i;
     }
@@ -248,28 +256,27 @@ BOOST_AUTO_TEST_CASE(dft_r2c_c2c_c2r_test) {
 
   // Apply r2c and then c2c
   printf("Fill r2c.fourier() aka c2c.signal()\n");
-  r2c.apply();
+  real.transform();
   printf("Fill c2c.fourier()\n");
-  c2c.apply();
+  complex.transform();
 
   // Inverse c2c and then r2c
   printf("Fill c2c.signal() aka r2c.fourier()\n");
-  c2c.inverseNormalize();
+  inverseComplex.transform().normalize();
   printf("Fill r2c.signal()\n");
-  r2c.inverseNormalize();
+  inverseReal.transform().normalize();
 
   // Check values are recovered
   for (long i = 0; i < count; ++i) {
-    auto signal = r2c.signal(i);
+    auto signal = real.inBuffer(i);
     for (const auto& p : signal.domain()) {
-      const auto expected = 1 + p[0] + p[1] + i; // No scaling anymore
+      const auto expected = 1 + p[0] + p[1] + i;
       const auto value = signal[p];
       BOOST_TEST(value > 0.99 * expected);
       BOOST_TEST(value < 1.01 * expected);
     }
   }
 }
-*/
 
 //-----------------------------------------------------------------------------
 

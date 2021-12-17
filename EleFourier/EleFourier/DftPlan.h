@@ -209,12 +209,9 @@ public:
    * which means that the input buffer of the composed plan (`planB`) has the same life cycle.
    */
   template <typename TPlan>
-  DftPlan<typename TPlan::Type, true, false> compose() {
-    return {
-        m_shape,
-        m_count,
-        m_out.data(),
-        nullptr}; // FIXME not necessarily m_shape, e.g. RealForwardDft -> ComplexForwardDft
+  DftPlan<typename TPlan::Type, true, false> compose(const Fits::Position<2>& shape) {
+    assert(outShape() == TPlan::Type::inShape(shape));
+    return {shape, m_count, m_out.data(), nullptr};
   }
 
   /**
@@ -246,7 +243,7 @@ public:
   /**
    * @brief Get the logical plane shape.
    */
-  const Fits::Position<2>& shape() const {
+  const Fits::Position<2>& logicalShape() const {
     return m_shape;
   }
 
@@ -314,7 +311,7 @@ public:
    */
   DftPlan& normalize() {
     const auto factor = normalizationFactor();
-    for (auto& c : m_in) {
+    for (auto& c : m_out) {
       c /= factor;
     }
     return *this;
