@@ -79,7 +79,6 @@ def mainMethod(args):
     with set_backend(pyfftw.interfaces.scipy_fft, only=True):
         # Turn on the cache for optimum performance
         pyfftw.interfaces.cache.enable()
-
         transform = []
         for hdu in hdul:
             # Copy in input buffers
