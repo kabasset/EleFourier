@@ -23,6 +23,7 @@ elements_depends_on_subdirs(EleFits EleFitsUtils EleFitsValidation)
 #          find_package(CppUnit)
 #===============================================================================
 find_package(FFTW)
+find_package(OpenMP)
 
 #===============================================================================
 # Declare the library dependencies here
@@ -33,8 +34,8 @@ find_package(FFTW)
 #                     PUBLIC_HEADERS ElementsExamples)
 #===============================================================================
 elements_add_library(EleFourier src/lib/*.cpp
-                     INCLUDE_DIRS ElementsKernel EleFits EleFitsUtils EleFitsValidation FFTW
-                     LINK_LIBRARIES ElementsKernel EleFits EleFitsUtils EleFitsValidation FFTW
+                     INCLUDE_DIRS ElementsKernel EleFits EleFitsUtils EleFitsValidation FFTW OpenMP
+                     LINK_LIBRARIES ElementsKernel EleFits EleFitsUtils EleFitsValidation FFTW OpenMP
                      PUBLIC_HEADERS EleFourier)
 
 #===============================================================================
@@ -45,6 +46,8 @@ elements_add_library(EleFourier src/lib/*.cpp
 #                        LINK_LIBRARIES Boost ElementsExamples)
 #===============================================================================
 elements_add_executable(EleFourierTutorial src/program/EleFourierTutorial.cpp
+                     LINK_LIBRARIES EleFourier)
+elements_add_executable(EleFourierParallelizationTutorial src/program/EleFourierParallelizationTutorial.cpp
                      LINK_LIBRARIES EleFourier)
 
 #===============================================================================

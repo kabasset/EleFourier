@@ -69,11 +69,6 @@ Fits::PtrRaster<T, 3> initFftwBuffer(const Fits::Position<2>& shape, long count,
   // Assert that data is nullptr if and only if shared
   assert(bool(data) == SharesData);
   T* d = SharesData ? data : (T*)fftw_malloc(sizeof(T) * shapeSize(shape) * count);
-  if (SharesData) {
-    printf("Data already allocated at %p\n", (void*)d);
-  } else {
-    printf("Allocated %li values at %p\n", shapeSize(shape) * count, (void*)d);
-  }
   return {{shape[0], shape[1], count}, d};
 }
 
@@ -180,6 +175,11 @@ public:
     assert(not SharesOut);
   }
 
+  DftPlan(const DftPlan&) = default;
+  DftPlan(DftPlan&&) = default;
+  DftPlan& operator=(const DftPlan&) = default;
+  DftPlan& operator=(DftPlan&&) = default;
+
   /**
    * @brief Create the inverse `DftPlan` with shared buffers.
    * @details
@@ -223,11 +223,9 @@ public:
   ~DftPlan() {
     fftw_destroy_plan(m_plan);
     if (not SharesIn) {
-      printf("Freeing input at: %p\n", (void*)m_in.data());
       fftw_free(m_in.data());
     }
     if (not SharesOut) {
-      printf("Freeing output: %p\n", (void*)m_out.data());
       fftw_free(m_out.data());
     }
     FftwGlobalsCleaner::instantiate();

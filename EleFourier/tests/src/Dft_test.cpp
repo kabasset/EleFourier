@@ -255,15 +255,11 @@ BOOST_AUTO_TEST_CASE(dft_r2c_c2c_c2r_test) {
   }
 
   // Apply r2c and then c2c
-  printf("Fill r2c.fourier() aka c2c.signal()\n");
   real.transform();
-  printf("Fill c2c.fourier()\n");
   complex.transform();
 
   // Inverse c2c and then r2c
-  printf("Fill c2c.signal() aka r2c.fourier()\n");
   inverseComplex.transform().normalize();
-  printf("Fill r2c.signal()\n");
   inverseReal.transform().normalize();
 
   // Check values are recovered
