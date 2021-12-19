@@ -64,11 +64,9 @@ public:
  * @warning
  * Data should be freed with `fftw_free()`.
  */
-template <typename T, bool SharesData>
+template <typename T>
 Fits::PtrRaster<T, 3> initFftwBuffer(const Fits::Position<2>& shape, long count, T* data) {
-  // Assert that data is nullptr if and only if shared
-  assert(bool(data) == SharesData);
-  T* d = SharesData ? data : (T*)fftw_malloc(sizeof(T) * shapeSize(shape) * count);
+  T* d = data ? data : (T*)fftw_malloc(sizeof(T) * shapeSize(shape) * count);
   return {{shape[0], shape[1], count}, d};
 }
 
@@ -119,9 +117,10 @@ Fits::PtrRaster<T, 3> initFftwBuffer(const Fits::Position<2>& shape, long count,
  * - None of the transforms are scaled, which means that a factor `width * height` is introduced
  *   by calling `transform()` and then `inverse().transform()` - `normalize()` performs normalization on request.
  */
-template <typename TType, bool SharesIn = false, bool SharesOut = false>
-class DftPlan { // FIXME rename as FftwPlan
-  template <typename, bool, bool>
+template <typename TType>
+class DftPlan {
+
+  template <typename>
   friend class DftPlan;
 
 public:
@@ -138,7 +137,7 @@ public:
   /**
    * @brief The inverse plan.
    */
-  using InversePlan = DftPlan<InverseType>;
+  using Inverse = DftPlan<InverseType>;
 
   /**
    * @brief The signal value type.
@@ -151,6 +150,13 @@ public:
   using OutValue = typename Type::OutValue;
 
 private:
+  enum BufferOwning
+  {
+    DoesNotOwn = 0,
+    OwnsIn = 0b10,
+    OwnsOut = 0b01,
+  };
+
   /**
    * @brief Constructor.
    * @param shape The logical plane shape
@@ -160,9 +166,9 @@ private:
    */
   DftPlan(Fits::Position<2> shape, long count, InValue* inData, OutValue* outData) :
       m_shape {shape}, m_inShape {Type::inShape(shape)}, m_outShape {Type::outShape(shape)}, m_count {count},
-      m_in {initFftwBuffer<InValue, SharesIn>(m_inShape, m_count, inData)},
-      m_out {initFftwBuffer<OutValue, SharesOut>(m_outShape, m_count, outData)},
-      m_plan {initFftwPlan<Type>(m_in, m_out)} {}
+      m_owning {BufferOwning((inData ? DoesNotOwn : OwnsIn) | (outData ? DoesNotOwn : OwnsOut))},
+      m_in {initFftwBuffer<InValue>(m_inShape, m_count, inData)},
+      m_out {initFftwBuffer<OutValue>(m_outShape, m_count, outData)}, m_plan {initFftwPlan<Type>(m_in, m_out)} {}
 
 public:
   /**
@@ -171,8 +177,8 @@ public:
    * @param count The number of planes
    */
   DftPlan(Fits::Position<2> shape, long count = 1) : DftPlan(shape, count, nullptr, nullptr) {
-    assert(not SharesIn);
-    assert(not SharesOut);
+    assert(not(m_sharing & SharesIn));
+    assert(not(m_sharing & SharesOut));
   }
 
   DftPlan(const DftPlan&) = default;
@@ -192,7 +198,7 @@ public:
    * This plan (`planA` from the snippet) is the owner of the buffers, which will be freed by its destructor,
    * which means that the buffers of the inverse plan (`planB`) has the same life cycle.
    */
-  DftPlan<InverseType, true, true> inverse() {
+  Inverse inverse() {
     return {m_shape, m_count, m_out.data(), m_in.data()};
   }
 
@@ -209,7 +215,7 @@ public:
    * which means that the input buffer of the composed plan (`planB`) has the same life cycle.
    */
   template <typename TPlan>
-  DftPlan<typename TPlan::Type, true, false> compose(const Fits::Position<2>& shape) {
+  TPlan compose(const Fits::Position<2>& shape) {
     assert(outShape() == TPlan::Type::inShape(shape));
     return {shape, m_count, m_out.data(), nullptr};
   }
@@ -222,10 +228,10 @@ public:
    */
   ~DftPlan() {
     fftw_destroy_plan(m_plan);
-    if (not SharesIn) {
+    if (m_owning & OwnsIn) {
       fftw_free(m_in.data());
     }
-    if (not SharesOut) {
+    if (m_owning & OwnsOut) {
       fftw_free(m_out.data());
     }
     FftwGlobalsCleaner::instantiate();
@@ -335,6 +341,11 @@ private:
    * @brief The number of planes.
    */
   long m_count;
+
+  /**
+   * @brief The buffer sharing flags.
+   */
+  BufferOwning m_owning;
 
   /**
    * @brief The input stack.

@@ -52,10 +52,10 @@ struct BranchDfts {
   RealDft r;
 
   /** Complex DFT piped to the real DFT's output. */
-  DftPlan<ComplexDftType, true, false> c; // FIXME ugly
+  ComplexDft c;
 
   /** In-place inverse complex DFT. */
-  decltype(c.inverse()) i; // FIXME ugly
+  ComplexDft::Inverse i;
 
   /** Branch-wise chronometer. */
   Fits::Validation::Chronometer<std::chrono::milliseconds> chrono;
