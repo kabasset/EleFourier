@@ -41,21 +41,32 @@ using namespace Fourier;
  */
 struct BranchDfts {
 
+  /** Pupil to monochromatic PSF transform. */
   RealDft pupilToPsf;
+
+  /** Monochromatic PSF to MTF transform. */
   RealDft psfToMtf;
-  ComplexDft::Inverse psfsToBroadband;
+
+  /** Total MTF to broadband PSF transform. */
+  ComplexDft::Inverse mtfToBroadband;
 
   /** Branch-wise chronometer. */
   Fits::Validation::Chronometer<std::chrono::milliseconds> chrono;
 
   /** Constructor. */
   BranchDfts(const Fits::Position<2>& pupilShape, const Fits::Position<2>& broadbandShape) :
-      pupilToPsf(pupilShape), psfToMtf(pupilShape), psfsToBroadband(broadbandShape), chrono() {}
+      pupilToPsf(pupilShape), psfToMtf(pupilShape), mtfToBroadband(broadbandShape), chrono() {}
 };
 
+/**
+ * Program class.
+ */
 class EleFourierParallelizationTutorial : public Elements::Program {
 
 public:
+  /**
+   * Define program options.
+   */
   std::pair<OptionsDescription, PositionalOptionsDescription> defineProgramArguments() override {
     Fits::ProgramOptions options("Demonstrates multi-thread usage of the library.");
     options.named("params", value<long>()->default_value(40), "Number of parameters");
@@ -66,10 +77,14 @@ public:
     return options.asPair();
   }
 
+  /**
+   * Run!
+   */
   Elements::ExitCode mainMethod(std::map<std::string, VariableValue>& args) override {
 
     Elements::Logging logger = Elements::Logging::getLogger("EleFourierParallelizationTutorial");
 
+    // Read options
     const auto params = args["params"].as<long>();
     const auto branches = args["branches"].as<long>();
     const auto lambdas = args["lambdas"].as<long>();
@@ -104,16 +119,15 @@ public:
       // Shortcuts
       auto& pupilToPsf = dfts[i].pupilToPsf;
       auto& psfToMtf = dfts[i].psfToMtf;
-      auto& psfsToBroadband = dfts[i].psfsToBroadband;
+      auto& mtfToBroadband = dfts[i].mtfToBroadband;
       auto& chrono = dfts[i].chrono;
-      auto pupilBegin = pupilToPsf.inBuffer().begin();
-      auto pupilEnd = pupilToPsf.inBuffer().end();
+      auto mtfSum = mtfToBroadband.inBuffer();
 
       // Random number generator
+      auto pupilBegin = pupilToPsf.inBuffer().begin();
+      auto pupilEnd = pupilToPsf.inBuffer().end();
       std::default_random_engine engine;
       std::uniform_real_distribution<double> distribution(0., 1.);
-
-      Fits::VecRaster<std::complex<double>> mtfSum(broadbandShape);
 
       // Loop over lambdas
       for (long l = 0; l < lambdas; ++l) {
@@ -142,7 +156,7 @@ public:
         }
       }
       chrono.start();
-      psfsToBroadband.transform();
+      mtfToBroadband.transform();
       chrono.stop();
     }
     programChrono.stop();
