@@ -17,4 +17,4 @@ set(ELEMENTS_PARALLEL ON
 #                         elements_project(MyProject 1.0 USE Element 3.9)
 #===============================================================================
 
-elements_project(EleFourier 0.9 USE EleFits 4.1)
+elements_project(EleFourier 0.9 USE EleFits 5.0.0)

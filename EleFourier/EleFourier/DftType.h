@@ -125,8 +125,9 @@ template <>
 Fits::Position<2> HermitianComplexDftType::Parent::outShape(const Fits::Position<2>& shape);
 
 template <typename TType>
-fftw_plan
-initFftwPlan(Fits::Raster<typename TType::InValue, 3>& in, typename Fits::Raster<typename TType::OutValue, 3>& out);
+fftw_plan initFftwPlan(
+    Fits::PtrRaster<typename TType::InValue, 3>& in,
+    typename Fits::PtrRaster<typename TType::OutValue, 3>& out);
 
 } // namespace Fourier
 } // namespace Euclid
