@@ -49,6 +49,8 @@ elements_add_executable(EleFourierTutorial src/program/EleFourierTutorial.cpp
                      LINK_LIBRARIES EleFourier)
 elements_add_executable(EleFourierParallelizationTutorial src/program/EleFourierParallelizationTutorial.cpp
                      LINK_LIBRARIES EleFourier)
+elements_add_executable(EleFourierSparseExp src/program/EleFourierSparseExp.cpp
+                     LINK_LIBRARIES EleFourier)
 
 #===============================================================================
 # Declare the Boost tests here
