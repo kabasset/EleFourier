@@ -62,6 +62,15 @@ Fits::VecRaster<double> generatePupil(long maskSide, long pupilRadius) {
   return pupil;
 }
 
+template <typename TRaster>
+void saveSif(const TRaster& raster, const std::string& filename) {
+  if (filename == "") {
+    return;
+  }
+  Fits::SifFile f(filename, Fits::FileMode::Overwrite);
+  f.writeRaster(raster);
+}
+
 /**
  * @brief Monochromatic data buffers.
  */
@@ -69,45 +78,52 @@ struct MonochromaticData {
 
   double minusTwoPiOverLambda;
   std::vector<double> alphas;
-  Fits::VecRaster<std::complex<double>> amplitude;
+  Fourier::ComplexDft pupilToPsf;
+  Fits::PtrRaster<std::complex<double>> pupil;
+  Fits::PtrRaster<std::complex<double>> amplitude;
   Fits::VecRaster<double> intensity;
 
   MonochromaticData(double lambda, long maskSide, std::vector<double> alphaGuesses) :
-      minusTwoPiOverLambda(-2 * 3.1415926 / lambda), alphas(std::move(alphaGuesses)), amplitude({maskSide, maskSide}),
-      intensity({maskSide, maskSide}) {}
+      minusTwoPiOverLambda(-2 * 3.1415926 / lambda), alphas(std::move(alphaGuesses)), pupilToPsf({maskSide, maskSide}),
+      pupil(pupilToPsf.inBuffer()), amplitude(pupilToPsf.outBuffer()), intensity({maskSide, maskSide}) {}
 
-  std::complex<double> computeLocalPhase(double pupil, const double* zernikes) {
+  std::complex<double> computeLocalPhase(double mask, const double* zernikes) {
     double sum = 0;
     auto zIt = zernikes;
     for (auto aIt = alphas.begin(); aIt != alphas.end(); ++aIt, ++zIt) {
       sum += (*aIt) * (*zIt);
     }
-    return pupil * std::exp(std::complex<double>(0, minusTwoPiOverLambda * sum));
+    return mask * std::exp(std::complex<double>(0, minusTwoPiOverLambda * sum));
   }
 
   template <typename TP, typename TZ>
-  Fits::VecRaster<std::complex<double>>& evalCompleteAmplitude(const TP& pupil, const TZ& zernikes) {
-    auto pupilData = pupil.data();
+  Fits::PtrRaster<std::complex<double>>& evalCompletePupil(const TP& mask, const TZ& zernikes) {
+    auto maskData = mask.data();
     auto zernikesData = zernikes.data();
     const auto size = alphas.size();
-    for (auto ampIt = amplitude.begin(); ampIt != amplitude.end(); ++ampIt, ++pupilData, zernikesData += size) {
-      *ampIt = computeLocalPhase(*pupilData, zernikesData);
+    for (auto it = pupil.begin(); it != pupil.end(); ++it, ++maskData, zernikesData += size) {
+      *it = computeLocalPhase(*maskData, zernikesData);
     }
-    return amplitude;
+    return pupil;
   }
 
   template <typename TP, typename TZ>
-  Fits::VecRaster<std::complex<double>>& evalSparseAmplitude(const TP& pupil, const TZ& zernikes) {
-    auto pupilData = pupil.data();
+  Fits::PtrRaster<std::complex<double>>& evalSparsePupil(const TP& mask, const TZ& zernikes) {
+    auto maskData = mask.data();
     auto zernikesData = zernikes.data();
     const auto size = alphas.size();
-    for (auto ampIt = amplitude.begin(); ampIt != amplitude.end(); ++ampIt, ++pupilData, zernikesData += size) {
-      if (*pupilData != 0) {
-        *ampIt = computeLocalPhase(*pupilData, zernikesData);
+    for (auto it = pupil.begin(); it != pupil.end(); ++it, ++maskData, zernikesData += size) {
+      if (*maskData != 0) {
+        *it = computeLocalPhase(*maskData, zernikesData);
       } else {
-        *ampIt = 0;
+        *it = 0;
       }
     }
+    return pupil;
+  }
+
+  Fits::PtrRaster<std::complex<double>>& evalAmplitude() {
+    pupilToPsf.transform();
     return amplitude;
   }
 
@@ -121,32 +137,21 @@ struct MonochromaticData {
   }
 };
 
-template <typename TRaster>
-void saveSif(const TRaster& raster, const std::string& filename) {
-  if (filename == "") {
-    return;
-  }
-  Fits::SifFile f(filename, Fits::FileMode::Overwrite);
-  f.writeRaster(raster);
-}
-
 class EleFourierSparseExp : public Elements::Program {
 
 public:
   std::pair<OptionsDescription, PositionalOptionsDescription> defineProgramArguments() override {
     Fits::ProgramOptions options("Compare complete and sparse exponentiations.");
     options.named("side", value<long>()->default_value(1024), "Pupil mask side");
+    // FIXME options.named("side", 1024L, "Pupil radius");
     options.named("radius", value<long>()->default_value(512), "Pupil radius");
-    // FIXME options.named("radius", 1024L, "Pupil radius");
     options.named("alphas", value<long>()->default_value(40), "Number of Zernike indices");
-    options.named("pupil", value<std::string>()->default_value("/tmp/pupil.fits"), "Pupil mask input or output file");
-    // FIXME options.named("pupil", "/tmp/pupil.fits"s, "Pupil mask input or output file");
-    options.named(
-        "zernike",
-        value<std::string>()->default_value("/tmp/zernike.fits"),
-        "Zernike polynomials input or output file");
-    options.named("psf", value<std::string>()->default_value("/tmp/psf.fits"), "PSF input or output file");
-    options.flag("sparse", "Compute exp only where mask is not null");
+
+    options.named("mask", value<std::string>()->default_value("/tmp/mask.fits"), "Pupil mask file");
+    options.named("zernike", value<std::string>()->default_value("/tmp/zernike.fits"), "Zernike polynomials file");
+    options.named("psf", value<std::string>()->default_value("/tmp/psf.fits"), "PSF file");
+
+    options.flag("sparse", "Compute pupil only where mask is not null");
     return options.asPair();
   }
 
@@ -156,33 +161,62 @@ public:
     const auto maskSide = args["side"].as<long>();
     const auto pupilRadius = args["radius"].as<long>();
     const auto alphaCount = args["alphas"].as<long>();
-    const auto pupilFilename = args["pupil"].as<std::string>();
+    const auto maskFilename = args["mask"].as<std::string>();
     const auto zernikeFilename = args["zernike"].as<std::string>();
     const auto psfFilename = args["psf"].as<std::string>();
     const auto sparse = args["sparse"].as<bool>();
 
+    using Chrono = Fits::Validation::Chronometer<std::chrono::milliseconds>;
+    Chrono chrono;
+
     logger.info("Generating pupil mask...");
     // FIXME load if exists, generate and save otherwise
+    chrono.start();
     auto pupil = generatePupil(maskSide, pupilRadius);
-    saveSif(pupil, pupilFilename);
+    chrono.stop();
+    logger.info() << "  " << chrono.last().count() << "ms";
+    saveSif(pupil, maskFilename);
 
     logger.info("Generating Zernike polynomials...");
+    chrono.start();
     auto zernike = generateZernike(maskSide, alphaCount);
+    chrono.stop();
+    logger.info() << "  " << chrono.last().count() << "ms";
     saveSif(zernike, zernikeFilename);
 
     logger.info("Generating Zernike coefficients...");
+    chrono.start();
     std::vector<double> alphas(alphaCount, 1);
+    chrono.stop();
+    logger.info() << "  " << chrono.last().count() << "ms";
 
-    logger.info("Allocating memory...");
+    logger.info("Planning DFT and allocating memory...");
+    chrono.start();
     MonochromaticData data(500., maskSide, alphas);
+    chrono.stop();
+    logger.info() << "  " << chrono.last().count() << "ms";
+
+    chrono.start();
     if (sparse) {
-      logger.info("Computing PSF amplitude over non zero points...");
-      data.evalSparseAmplitude(pupil, zernike);
+      logger.info("Computing pupil amplitude over non zero points (complex exp)...");
+      data.evalSparsePupil(pupil, zernike);
     } else {
-      logger.info("Computing PSF amplitude over all points...");
-      data.evalCompleteAmplitude(pupil, zernike);
+      logger.info("Computing pupil amplitude over all points (complex exp)...");
+      data.evalCompletePupil(pupil, zernike);
     }
-    logger.info("Computing PSF intensity over all points...");
+    chrono.stop();
+    logger.info() << "  " << chrono.last().count() << "ms";
+
+    logger.info("Computing PSF amplitude (complex DFT)...");
+    chrono.start();
+    data.evalAmplitude();
+    chrono.stop();
+    logger.info() << "  " << chrono.last().count() << "ms";
+
+    logger.info("Computing PSF intensity (norm)...");
+    chrono.start();
+    chrono.stop();
+    logger.info() << "  " << chrono.last().count() << "ms";
     saveSif(data.evalIntensity(), psfFilename);
 
     logger.info("Done.");
