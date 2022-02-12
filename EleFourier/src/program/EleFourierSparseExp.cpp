@@ -62,6 +62,48 @@ Fits::VecRaster<double> generatePupil(long maskSide, long pupilRadius) {
   return pupil;
 }
 
+template <typename TIter>
+void swapRanges(TIter aBegin, TIter aEnd, TIter bBegin) {
+  TIter aIt = aBegin;
+  TIter bIt = bBegin;
+  while (aIt != aEnd) {
+    std::iter_swap(aIt++, bIt++);
+  }
+}
+
+template <typename TRaster>
+TRaster& fftShift(TRaster& raster) {
+  const auto width = raster.shape()[0];
+  const auto height = raster.shape()[1];
+  if (width % 2 != 0 || height % 2 != 0) {
+    throw std::runtime_error("fftShift() only works with even sizes.");
+  }
+  const long halfWidth = raster.shape()[0] / 2;
+  const long halfHeight = raster.shape()[1] / 2;
+
+  for (long y = 0; y < halfHeight; ++y) {
+
+    // Swap UL with LR
+    auto ulBegin = &raster[{0, y}];
+    auto ulEnd = ulBegin + halfWidth;
+    auto lrBegin = &raster[{halfWidth, y + halfHeight}];
+    swapRanges(ulBegin, ulEnd, lrBegin);
+
+    // Swap UR and LL
+    auto urBegin = ulEnd;
+    auto urEnd = urBegin + halfWidth;
+    auto llBegin = &raster[{0, y + halfHeight}];
+    swapRanges(urBegin, urEnd, llBegin);
+  }
+
+  return raster;
+}
+
+/**
+ * @brief Save as a SIF file.
+ * @details
+ * Does nothing if filename is empty.
+ */
 template <typename TRaster>
 void saveSif(const TRaster& raster, const std::string& filename) {
   if (filename == "") {
@@ -217,7 +259,7 @@ public:
     chrono.start();
     chrono.stop();
     logger.info() << "  " << chrono.last().count() << "ms";
-    saveSif(data.evalIntensity(), psfFilename);
+    saveSif(fftShift(data.evalIntensity()), psfFilename);
 
     logger.info("Done.");
     return ExitCode::OK;
