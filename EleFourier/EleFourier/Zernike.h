@@ -20,6 +20,7 @@
 #ifndef _ELEFOURIER_ZERNIKE_H
 #define _ELEFOURIER_ZERNIKE_H
 
+#include <algorithm> // copy_n
 #include <array>
 #include <limits> // NaN
 #include <utility> // index_sequence
@@ -28,6 +29,8 @@ namespace Euclid {
 namespace Fourier {
 
 struct LocalZernikeSeries {
+
+  static constexpr long JMax = 20;
 
   double x1, x2, x3, x4, x5, x6, x7, x8, x9;
   double y1, y2, y3, y4, y5, y6, y7, y8, y9;
@@ -58,10 +61,9 @@ struct LocalZernikeSeries {
     return ansiList(std::make_index_sequence<Size>());
   }
 
-  template <std::size_t Size>
-  void ansiSeq(double* dst) {
-    const auto array = ansiSeq<Size>();
-    std::copy(array.begin(), array.end(), dst);
+  void ansiSeq(double* dst, long count = JMax + 1) {
+    const auto array = ansiSeq<JMax + 1>();
+    std::copy_n(array.begin(), count, dst); // FIXME throw if count > JMax + 1
   }
 };
 

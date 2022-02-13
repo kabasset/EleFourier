@@ -23,6 +23,7 @@
 #include "EleFitsUtils/ProgramOptions.h"
 #include "EleFitsValidation/Chronometer.h"
 #include "EleFourier/Dft.h"
+#include "EleFourier/Zernike.h"
 #include "ElementsKernel/ProgramHeaders.h"
 
 #include <complex>
@@ -41,7 +42,14 @@ using namespace Euclid;
  */
 Fits::VecRaster<double, 3> generateZernike(long maskSide, long count) {
   const Fits::Position<3> shape = {count, maskSide, maskSide};
-  Fits::Test::RandomRaster<double, 3> zernike(shape, 0, 1);
+  const double radius = 0.5 * maskSide;
+  Fits::VecRaster<double, 3> zernike(shape);
+  for (long v = 0; v < maskSide; ++v) {
+    for (long u = 0; u < maskSide; ++u) {
+      Fourier::LocalZernikeSeries series(u, v, radius, 0); // Cannot use NaN for DFTs
+      series.ansiSeq(&zernike[{0, u, v}], count);
+    }
+  }
   return zernike;
 }
 
@@ -186,7 +194,7 @@ public:
     Fits::ProgramOptions options("Compare complete and sparse exponentiations.");
     options.named("side", value<long>()->default_value(1024), "Pupil mask side");
     // FIXME options.named("side", 1024L, "Pupil radius");
-    options.named("radius", value<long>()->default_value(512), "Pupil radius");
+    options.named("radius", value<long>()->default_value(256), "Pupil radius");
     options.named("alphas", value<long>()->default_value(40), "Number of Zernike indices");
 
     options.named("mask", value<std::string>()->default_value("/tmp/mask.fits"), "Pupil mask file");
@@ -224,7 +232,11 @@ public:
     auto zernike = generateZernike(maskSide, alphaCount);
     chrono.stop();
     logger.info() << "  " << chrono.last().count() << "ms";
-    saveSif(zernike, zernikeFilename);
+    Fits::VecRaster<double, 3> zernikeDisp({maskSide, maskSide, alphaCount});
+    for (const auto& p : zernikeDisp.domain()) {
+      zernikeDisp[p] = zernike[{p[2], p[0], p[1]}];
+    }
+    saveSif(zernikeDisp, zernikeFilename);
 
     logger.info("Generating Zernike coefficients...");
     chrono.start();
