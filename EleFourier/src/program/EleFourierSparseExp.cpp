@@ -34,6 +34,8 @@ using boost::program_options::value;
 
 using namespace Euclid;
 
+static auto logger = Elements::Logging::getLogger("EleFourierSparseExp");
+
 /**
  * @brief Generate Zernike polynomials for each point and each index.
  * @details
@@ -119,6 +121,7 @@ void saveSif(const TRaster& raster, const std::string& filename) {
   }
   Fits::SifFile f(filename, Fits::FileMode::Overwrite);
   f.writeRaster(raster);
+  logger.info() << "  See: " << filename;
 }
 
 /**
@@ -206,7 +209,6 @@ public:
   }
 
   ExitCode mainMethod(std::map<std::string, VariableValue>& args) override {
-    Logging logger = Logging::getLogger("EleFourierSparseExp");
 
     const auto maskSide = args["side"].as<long>();
     const auto pupilRadius = args["radius"].as<long>();
@@ -244,10 +246,14 @@ public:
     Fits::Test::RandomRaster<double, 1>({alphaCount}, -1, 1).moveTo(alphas);
     chrono.stop();
     logger.info() << "  " << chrono.last().count() << "ms";
+    logger.debug() << "  Coefficients:";
+    for (const auto& a : alphas) {
+      logger.debug() << "    " << a;
+    }
 
     logger.info("Planning DFT and allocating memory...");
     chrono.start();
-    MonochromaticData data(500., maskSide, alphas);
+    MonochromaticData data(.500, maskSide, alphas);
     chrono.stop();
     logger.info() << "  " << chrono.last().count() << "ms";
 
@@ -270,9 +276,10 @@ public:
 
     logger.info("Computing PSF intensity (norm)...");
     chrono.start();
+    data.evalIntensity();
     chrono.stop();
     logger.info() << "  " << chrono.last().count() << "ms";
-    saveSif(fftShift(data.evalIntensity()), psfFilename);
+    saveSif(fftShift(data.intensity), psfFilename);
 
     logger.info("Done.");
     return ExitCode::OK;
