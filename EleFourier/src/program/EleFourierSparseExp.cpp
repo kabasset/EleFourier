@@ -37,25 +37,6 @@ using namespace Euclid;
 static auto logger = Elements::Logging::getLogger("EleFourierSparseExp");
 
 /**
- * @brief Generate Zernike polynomials for each point and each index.
- * @details
- * The axes are ordered as (lambda, u, v) for performance:
- * for each point, indices are contiguous in memory.
- */
-Fits::VecRaster<double, 3> generateZernike(long maskSide, long count) {
-  const Fits::Position<3> shape = {count, maskSide, maskSide};
-  const double radius = 0.5 * maskSide;
-  Fits::VecRaster<double, 3> zernike(shape);
-  for (long v = 0; v < maskSide; ++v) {
-    for (long u = 0; u < maskSide; ++u) {
-      Fourier::LocalZernikeSeries series(u, v, radius, 0); // Cannot use NaN for DFTs
-      series.ansiSeq(&zernike[{0, u, v}], count);
-    }
-  }
-  return zernike;
-}
-
-/**
  * @brief Generate a circular pupil mask.
  */
 Fits::VecRaster<double> generatePupil(long maskSide, long pupilRadius) {
@@ -231,7 +212,7 @@ public:
 
     logger.info("Generating Zernike polynomials...");
     chrono.start();
-    auto zernike = generateZernike(maskSide, alphaCount);
+    auto zernike = Zernike::ansiCube(maskSide, alphaCount);
     chrono.stop();
     logger.info() << "  " << chrono.last().count() << "ms";
     Fits::VecRaster<double, 3> zernikeDisp({maskSide, maskSide, alphaCount});

@@ -32,11 +32,11 @@ BOOST_AUTO_TEST_SUITE(Zernike_test)
 
 BOOST_AUTO_TEST_CASE(save_zernikes_test) {
   constexpr long diameter = 1024;
-  Fits::VecRaster<double, 3> zernike({diameter, diameter, 20});
+  Fits::VecRaster<double, 3> zernike({diameter, diameter, Zernike::LocalZernikeSeries::JCount});
   for (long y = 0; y < zernike.length<1>(); ++y) {
     for (long x = 0; x < zernike.length<0>(); ++x) {
-      Fourier::LocalZernikeSeries series(x, y, 0.5 * diameter, 0);
-      const auto values = series.ansiSeq<20>();
+      Zernike::LocalZernikeSeries series(x, y, 0.5 * diameter, 0);
+      const auto values = series.ansiSeq<Zernike::LocalZernikeSeries::JCount>();
       for (long z = 0; z < zernike.length<2>(); ++z) {
         zernike[{x, y, z}] = values[z];
       }
