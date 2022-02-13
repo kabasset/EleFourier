@@ -228,7 +228,8 @@ public:
 
     logger.info("Generating Zernike coefficients...");
     chrono.start();
-    std::vector<double> alphas(alphaCount, 1);
+    std::vector<double> alphas;
+    Fits::Test::RandomRaster<double, 1>({alphaCount}, -1, 1).moveTo(alphas);
     chrono.stop();
     logger.info() << "  " << chrono.last().count() << "ms";
 
