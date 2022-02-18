@@ -94,7 +94,7 @@ public:
     primary.readTo(lvalueRaster);
     for (long i = 0; i < count; ++i) {
       lvalueRaster = imageDft.inBuffer(i);
-      f.access<Fits::ImageHdu>(i + 1).raster().readTo(lvalueRaster); // FIXME access<ImageRaster>()
+      f.access<Fits::ImageRaster>(i + 1).readTo(lvalueRaster);
     }
     chrono.stop();
     logger.info() << "  Done in: " << chrono.last().count() << "ms";

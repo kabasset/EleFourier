@@ -28,7 +28,7 @@ Fits::Position<2> RealDftType::Parent::outShape(const Fits::Position<2>& shape) 
 }
 
 template <>
-fftw_plan initFftwPlan<RealDftType>(Fits::Raster<double, 3>& in, Fits::Raster<std::complex<double>, 3>& out) {
+fftw_plan initFftwPlan<RealDftType>(Fits::PtrRaster<double, 3>& in, Fits::PtrRaster<std::complex<double>, 3>& out) {
   const auto& shape = in.shape();
   const int width = static_cast<int>(shape[0]);
   const int height = static_cast<int>(shape[1]);
@@ -49,7 +49,8 @@ fftw_plan initFftwPlan<RealDftType>(Fits::Raster<double, 3>& in, Fits::Raster<st
 }
 
 template <>
-fftw_plan initFftwPlan<Inverse<RealDftType>>(Fits::Raster<std::complex<double>, 3>& in, Fits::Raster<double, 3>& out) {
+fftw_plan
+initFftwPlan<Inverse<RealDftType>>(Fits::PtrRaster<std::complex<double>, 3>& in, Fits::PtrRaster<double, 3>& out) {
   const auto& shape = out.shape();
   const int width = static_cast<int>(shape[0]);
   const int height = static_cast<int>(shape[1]);
@@ -70,8 +71,9 @@ fftw_plan initFftwPlan<Inverse<RealDftType>>(Fits::Raster<std::complex<double>, 
 }
 
 template <>
-fftw_plan
-initFftwPlan<ComplexDftType>(Fits::Raster<std::complex<double>, 3>& in, Fits::Raster<std::complex<double>, 3>& out) {
+fftw_plan initFftwPlan<ComplexDftType>(
+    Fits::PtrRaster<std::complex<double>, 3>& in,
+    Fits::PtrRaster<std::complex<double>, 3>& out) {
   const auto& shape = in.shape();
   const int width = static_cast<int>(shape[0]);
   const int height = static_cast<int>(shape[1]);
@@ -94,8 +96,8 @@ initFftwPlan<ComplexDftType>(Fits::Raster<std::complex<double>, 3>& in, Fits::Ra
 
 template <>
 fftw_plan initFftwPlan<Inverse<ComplexDftType>>(
-    Fits::Raster<std::complex<double>, 3>& in,
-    Fits::Raster<std::complex<double>, 3>& out) {
+    Fits::PtrRaster<std::complex<double>, 3>& in,
+    Fits::PtrRaster<std::complex<double>, 3>& out) {
   const auto& shape = out.shape();
   const int width = static_cast<int>(shape[0]);
   const int height = static_cast<int>(shape[1]);
@@ -128,15 +130,15 @@ Fits::Position<2> HermitianComplexDftType::Parent::outShape(const Fits::Position
 
 template <>
 fftw_plan initFftwPlan<HermitianComplexDftType>(
-    Fits::Raster<std::complex<double>, 3>& in,
-    Fits::Raster<std::complex<double>, 3>& out) {
+    Fits::PtrRaster<std::complex<double>, 3>& in,
+    Fits::PtrRaster<std::complex<double>, 3>& out) {
   return initFftwPlan<ComplexDftType>(in, out);
 }
 
 template <>
 fftw_plan initFftwPlan<Inverse<HermitianComplexDftType>>(
-    Fits::Raster<std::complex<double>, 3>& in,
-    Fits::Raster<std::complex<double>, 3>& out) {
+    Fits::PtrRaster<std::complex<double>, 3>& in,
+    Fits::PtrRaster<std::complex<double>, 3>& out) {
   return initFftwPlan<Inverse<ComplexDftType>>(in, out);
 }
 

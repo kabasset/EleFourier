@@ -17,19 +17,33 @@
  *
  */
 
-#include "EleFourier/DftType.h"
+#include "EleFits/SifFile.h"
+#include "EleFourier/Zernike.h"
 
 #include <boost/test/unit_test.hpp>
 
-//-----------------------------------------------------------------------------
-
-BOOST_AUTO_TEST_SUITE(DftType_test)
+using namespace Euclid;
 
 //-----------------------------------------------------------------------------
 
-BOOST_AUTO_TEST_CASE(example_test) {
+BOOST_AUTO_TEST_SUITE(Zernike_test)
 
-  BOOST_FAIL("!!!! Please implement your tests !!!!");
+//-----------------------------------------------------------------------------
+
+BOOST_AUTO_TEST_CASE(save_zernikes_test) {
+  constexpr long diameter = 1024;
+  Fits::VecRaster<double, 3> zernike({diameter, diameter, Zernike::LocalZernikeSeries::JCount});
+  for (long y = 0; y < zernike.length<1>(); ++y) {
+    for (long x = 0; x < zernike.length<0>(); ++x) {
+      Zernike::LocalZernikeSeries series(x, y, 0.5 * diameter, 0);
+      const auto values = series.ansiSeq<Zernike::LocalZernikeSeries::JCount>();
+      for (long z = 0; z < zernike.length<2>(); ++z) {
+        zernike[{x, y, z}] = values[z];
+      }
+    }
+  }
+  Fits::SifFile f("/tmp/zernike.fits", Fits::FileMode::Overwrite);
+  f.writeRaster(zernike);
 }
 
 //-----------------------------------------------------------------------------

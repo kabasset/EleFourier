@@ -17,8 +17,4 @@
  *
  */
 
-#include "EleFourier/DftPlan.h"
-
-namespace Euclid {
-namespace Fourier {} // namespace Fourier
-} // namespace Euclid
+#include "EleFourier/Zernike.h"
