@@ -82,6 +82,7 @@ elements_add_unit_test(Zernike tests/src/Zernike_test.cpp
 #  elements_install_python_modules()
 #  elements_install_scripts()
 #===============================================================================
+elements_install_python_modules()
 
 #===============================================================================
 # Declare the Python programs here
@@ -89,6 +90,7 @@ elements_add_unit_test(Zernike tests/src/Zernike_test.cpp
 # elements_add_python_program(PythonProgramExample
 #                             ElementsExamples.PythonProgramExample)
 #===============================================================================
+elements_add_python_program(EleFourier_PyFFT_Tutorial EleFourier.EleFourier_PyFFT_Tutorial)
 
 #===============================================================================
 # Add the elements_install_conf_files macro

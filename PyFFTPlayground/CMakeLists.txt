@@ -63,6 +63,7 @@ elements_install_python_modules()
 #===============================================================================
 elements_add_python_program(PyFFTPlaygroundTutorial PyFFTPlayground.PyFFTPlaygroundTutorial)
 elements_add_python_program(PyFFTWPlayground PyFFTPlayground.PyFFTWPlayground)
+elements_add_python_program(PyFFTParallel PyFFTPlayground.PyFFTParallel)
 
 #===============================================================================
 # Add the elements_install_conf_files macro

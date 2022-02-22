@@ -33,7 +33,7 @@ class TimerError(Exception):
 
 
 class Timer:
-    def __init__(self, text="Elapsed time: {:0.4f} seconds", logger=print):
+    def __init__(self, text="Elapsed time: {:0.4f} milliseconds", logger=print):
         self._start_time = None
         self.text = text
         self.logger = logger
@@ -53,6 +53,6 @@ class Timer:
         elapsed_time = time.perf_counter() - self._start_time
         self._start_time = None
         if self.logger:
-            self.logger(self.text.format(elapsed_time))
+            self.logger(self.text.format(elapsed_time * 1000))
 
         return elapsed_time
