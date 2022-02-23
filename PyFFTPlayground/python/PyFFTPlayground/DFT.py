@@ -21,23 +21,27 @@ import pyfftw
 
 
 class DFT:
-    def __init__(self, transform, inverse):
-        self.transform = transform
-        self.inverse = inverse
+    def __init__(self, plan):
+        self.plan = plan
 
 
-def create_complex_plan(shape, flags=("FFTW_MEASURE", "FFTW_DESTROY_INPUT",)):
+def create_complex_plan(shape, flags):
     i = pyfftw.empty_aligned(shape, dtype="complex128")
     o = pyfftw.empty_aligned(shape, dtype="complex128")
-    # TODO Change flags to use default FFTW_MEASURE
-    return DFT(pyfftw.FFTW(i, o, flags=flags), pyfftw.FFTW(o, i, direction="FFTW_BACKWARD", flags=flags))
+    return DFT(pyfftw.FFTW(i, o, direction="FFTW_BACKWARD", flags=flags))
 
 
-def create_real_plan(shape, flags=("FFTW_MEASURE", "FFTW_DESTROY_INPUT",)):
+def create_real_plan(shape, flags):
     i = pyfftw.empty_aligned(shape, dtype="float64")
-    o = pyfftw.empty_aligned(shape // 2 + 1, dtype="complex128")
+    output_shape = (i.shape[0], i.shape[-1] // 2 + 1)
+    o = pyfftw.empty_aligned(output_shape, dtype="complex128")
 
-    # From https://hgomersall.github.io/pyFFTW/pyfftw/pyfftw.html
-    assert o.shape[0] == i.shape[0] // 2 + 1
+    return DFT(pyfftw.FFTW(i, o, flags=flags))
 
-    return DFT(pyfftw.FFTW(i, o, flags=flags), pyfftw.FFTW(o, i, direction="FFTW_BACKWARD", flags=flags))
+
+def create_real_plan_backward(shape, flags):
+    i = pyfftw.empty_aligned(shape, dtype="float64")
+    output_shape = (i.shape[0], i.shape[-1] // 2 + 1)
+    o = pyfftw.empty_aligned(output_shape, dtype="complex128")
+
+    return DFT(pyfftw.FFTW(o, i, direction="FFTW_BACKWARD", flags=flags))
