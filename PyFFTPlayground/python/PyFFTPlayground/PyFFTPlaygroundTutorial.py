@@ -27,6 +27,8 @@
 
 import argparse
 import ElementsKernel.Logging as log
+import ElementsKernel.Exit as Exit
+
 import numpy as np
 from astropy.io import fits
 from scipy.fftpack import fft2, ifft2

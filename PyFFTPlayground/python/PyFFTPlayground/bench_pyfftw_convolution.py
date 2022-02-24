@@ -8,7 +8,7 @@ import pyfftw
 import multiprocessing
 import scipy.signal
 import scipy.fft
-import numpy
+import numpy as np
 from timeit import Timer
 
 xsize = 1024
@@ -18,8 +18,8 @@ number_it = 10
 a = pyfftw.empty_aligned((xsize, ysize), dtype=np.float64)
 b = pyfftw.empty_aligned((xsize, ysize), dtype=np.float64)
 
-a[:] = numpy.random.randn(xsize, ysize)
-b[:] = numpy.random.randn(xsize, ysize)
+a[:] = np.random.randn(xsize, ysize)
+b[:] = np.random.randn(xsize, ysize)
 
 t = Timer(lambda: scipy.signal.fftconvolve(a, b))
 

@@ -29,9 +29,8 @@ import argparse
 import ElementsKernel.Logging as log
 import ElementsKernel.Exit as Exit
 import numpy as np
-import pyfftw
 
-from PyFFTPlayground.DFT import DFT, create_complex_plan, create_real_plan, create_real_plan_backward
+from PyFFTPlayground.DFT import create_complex_plan, create_real_plan, create_real_plan_backward
 from PyFFTPlayground.Timer import Timer
 
 
