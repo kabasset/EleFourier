@@ -35,7 +35,7 @@ def create_real_plan(shape, flags):
     output_shape = (i.shape[0], i.shape[-1] // 2 + 1)
     o = pyfftw.empty_aligned(output_shape, dtype="complex128")
 
-    return DFT(pyfftw.FFTW(i, o, flags=flags))
+    return DFT(pyfftw.FFTW(i, o, direction="FFTW_FORWARD", flags=flags))
 
 
 def create_real_plan_backward(shape, flags):

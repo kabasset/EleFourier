@@ -24,6 +24,7 @@
 
 """
 import time
+from dataclasses import dataclass, field
 
 
 class TimerError(Exception):
@@ -32,11 +33,11 @@ class TimerError(Exception):
     """
 
 
+@dataclass
 class Timer:
-    def __init__(self, text="Elapsed time: {:0.4f} milliseconds", logger=print):
-        self._start_time = None
-        self.text = text
-        self.logger = logger
+    _start_time: float = None
+    incs: list[float] = field(default_factory=list)
+    elapsed_time: float = 0
 
     def start(self):
         """Start a new timer"""
@@ -50,9 +51,10 @@ class Timer:
         if self._start_time is None:
             raise TimerError(f"Timer is not running. Use .start() to start it")
 
-        elapsed_time = time.perf_counter() - self._start_time
+        # Get increments in milli-seconds
+        inc = (time.perf_counter() - self._start_time) * 1000
+        self.elapsed_time += inc
+        self.incs.append(inc)
         self._start_time = None
-        if self.logger:
-            self.logger(self.text.format(elapsed_time * 1000))
 
-        return elapsed_time
+        return inc
