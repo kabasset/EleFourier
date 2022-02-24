@@ -35,6 +35,8 @@ class TimerError(Exception):
 
 @dataclass
 class Timer:
+    """Store each increment and the total elapsed time (elapsed_time should be computed from incs)"""
+
     _start_time: float = None
     incs: list[float] = field(default_factory=list)
     elapsed_time: float = 0

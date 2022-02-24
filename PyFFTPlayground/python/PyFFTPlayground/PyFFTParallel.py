@@ -26,25 +26,39 @@
 """
 
 import argparse
-import ElementsKernel.Logging as log
-import ElementsKernel.Exit as Exit
 from typing import Tuple, Any
 import numpy as np
 from functools import partial
 
-# Use concurrent.futures instead of multiprocessing as pyfftw Cython classes do no implement __reduce__ (pickled)
+# Use "concurrent.futures" instead of multiprocessing as pyfftw Cython classes do no implement __reduce__ (pickled)
 # See https://stackoverflow.com/questions/69032946/python-process-typeerror-no-default-reduce-due-to-non-trivial-cinit
-# Can't use ProcessPool also with concurrent.futures as it relies also on pickled object
+# Can't use ProcessPool also with "concurrent.futures" as it relies also on pickled object
 # There is an issue in pyfftw tracker which ask to pyfftw to add support for pickle in FFTW class
 # See https://github.com/pyFFTW/pyFFTW/issues/130
 # Using ThreadPoolExecutor
 import concurrent.futures
+
+import ElementsKernel.Logging as log
+import ElementsKernel.Exit as Exit
 
 from PyFFTPlayground.DFT import create_complex_plan, create_real_plan, create_real_plan_backward
 from PyFFTPlayground.Timer import Timer
 
 
 class BranchDFTs:
+    """The set of DFT plans of each parallel branch.
+
+    Attributes
+    ----------
+    - pupil_to_psf : PyFFTPlayground.DFT
+    - psf_to_mtf : PyFFTPlayground.DFT
+    - mtf_to_broadband : PyFFTPlayground.DFT
+    - lambdas: int
+        Number of monochromatic PSF to generate
+    - chrono: Timer
+        Chronometer to monitor DFTs in each branches
+    """
+
     def __init__(self, mask_side: int, psf_side: int, flags: Tuple[str], lambdas: int):
         self.pupil_to_psf = create_complex_plan((mask_side, mask_side), flags)
         self.psf_to_mtf = create_real_plan((mask_side, mask_side), flags)
@@ -53,12 +67,42 @@ class BranchDFTs:
         self.chrono = Timer()
 
 
-def gen_rand_comp_array(sizex: int, sizey: int) -> Any:
+def gen_rand_comp_array(sizex: int, sizey: int) -> "np.ndarray":
+    """Generate a random array of complex value (to simulate input pupil for instance)
+
+        Parameters
+        ----------
+        sizex : int
+           image side
+        sizey : int
+           image side
+
+        Returns
+        -------
+        np.ndarray:
+          ndarray of random complex numbers (real part generated from the "standard normal” distribution)
+        """
+
     return np.random.randn(sizex, sizey) + np.random.randn(sizex, sizey) * 1j
 
 
-def dummy_dfts(pupil: "numpy.ndarray", plan: BranchDFTs) -> Tuple[Any, Timer]:
-    # Shortcuts for BranchDFTs members
+def dummy_psf_broadband(pupil: "np.ndarray", plan: BranchDFTs) -> Tuple[Any, Timer]:
+    """Function to simulate pd computation. Loop over number of lambda value and compute 3 DFTs sequentially, sum all
+    mono PSF and apply a single inverse DFT to compute broadband PSF
+
+        Parameters
+        ----------
+        pupil : np.ndarray
+           Complex pupil function
+        plan : BranchDFTs
+           Set of FFTW plans
+
+        Returns
+        -------
+        tuple:
+          PSF broadband image and the chronometer associated to the computation
+        """
+    # Shortcuts for BranchDFTs attributes
     dft_pupil_to_psf = plan.pupil_to_psf.plan
     psf_to_mtf = plan.psf_to_mtf.plan
     mtf_to_broadband = plan.mtf_to_broadband.plan
@@ -69,6 +113,7 @@ def dummy_dfts(pupil: "numpy.ndarray", plan: BranchDFTs) -> Tuple[Any, Timer]:
     mtf_shape = psf_to_mtf.output_array.shape
     mtf_dtype = psf_to_mtf.output_array.dtype
     mtf_broad_sum = np.zeros(mtf_shape, dtype=mtf_dtype)
+
     # DFT for each lambda
     for l in range(lambdas):
         # Compute DFT
@@ -88,17 +133,20 @@ def dummy_dfts(pupil: "numpy.ndarray", plan: BranchDFTs) -> Tuple[Any, Timer]:
         mtf = psf_to_mtf(input_array=abs_psf_mono)
         chrono.stop()
 
-        # TODO Better way to merge each mono DFT
+        # TODO Implement a more realistic way to merge each mono DFT
         # Update sum of mtf
         mtf_broad_sum += mtf
 
     # Convert lambdas arrays of size mask_side*mask_side to one array of size broadband_side*broadband_side
-    # FIXME Wrong method probably here as mtf_broad_sum is of size mask.shape//2 + 1
+    # TODO Implement a more realistic generation of mono to multi broadband
     mtf_broad_sum /= lambdas
+
+    # Slice mtf_broad_sum array to ensure that its shape is compatible with the mtf_to_broadband FFTW plan
+    # Dummy selection here to simulate broadband of the correct shape
     broadband_shape = mtf_to_broadband.input_array.shape
     mtf_broad_sum = mtf_broad_sum[: broadband_shape[0], : broadband_shape[1]]
 
-    # Then compute the MTF broadband (inverse)
+    # Then compute the MTF broadband (inverse DFT)
     chrono.start()
     broadband = mtf_to_broadband(input_array=mtf_broad_sum)
     chrono.stop()
@@ -135,7 +183,7 @@ def defineSpecificProgramOptions():
 def mainMethod(args):
     """
     @brief The "main" method.
-    
+
     @details This method is the entry point to the program. In this sense, it is
     similar to a main (and it is why it is called mainMethod()).
     """
@@ -166,10 +214,12 @@ def mainMethod(args):
     pupil = gen_rand_comp_array(mask_side, mask_side)
 
     main_chrono.start()
+    # Use plan in parallel with concurrent.futures
+    # FIXME I was unable to implement it with multiprocessing (ProcessPool) as pyfftw objects are not compatible with pickle
     with concurrent.futures.ThreadPoolExecutor(max_workers=branches) as executor:
         # Use functools partial function for the fixed input pupil mask
         # Suggested here https://stackoverflow.com/a/49358837
-        results = executor.map(partial(dummy_dfts, pupil), plans)
+        results = executor.map(partial(dummy_psf_broadband, pupil), plans)
 
         if args.print:
             for i, broadband in enumerate(results):
@@ -184,7 +234,9 @@ def mainMethod(args):
     main_chrono.stop()
 
     logger.info("#")
-    logger.info(f"# Total elapsed time for planning + DFTs (WallTime): {main_chrono.elapsed_time:.3f} milliseconds")
+    logger.info(
+        f"# Total elapsed time for planning + DFTs in parallel branches: {main_chrono.elapsed_time:.3f} milliseconds"
+    )
     logger.info("#")
 
     return Exit.Code["OK"]

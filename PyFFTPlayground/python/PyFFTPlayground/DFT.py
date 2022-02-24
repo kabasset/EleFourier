@@ -16,21 +16,52 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
 
+from typing import Tuple, Any
 import pyfftw
 
 
 class DFT:
+    """A very (very) light wrapper around pyfftw.FFTW.
+
+    Keep it if at some point it is needed to wrap some methods in FFTW (to be able to use it with multiprocessing) or if
+    more information related to the computation need to be stored.
+
+    Attributes
+    ----------
+    - plan : pyfftw.FFTW
+        DFT plan definition
+
+    """
+
     def __init__(self, plan):
         self.plan = plan
 
 
-def create_complex_plan(shape, flags):
+def create_complex_plan(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.FFTW":
+    """Create plan for monochromatic PSF computation. It is a complex inverse DFT
+        Parameters
+        ----------
+        shape : tuple of ints
+           shape of the input and output DFT
+
+        flags : tuple of strings
+           pyfftw planning flags
+    """
     i = pyfftw.empty_aligned(shape, dtype="complex128")
     o = pyfftw.empty_aligned(shape, dtype="complex128")
     return DFT(pyfftw.FFTW(i, o, direction="FFTW_BACKWARD", flags=flags))
 
 
-def create_real_plan(shape, flags):
+def create_real_plan(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.FFTW":
+    """Create plan for Monochromatic PSF to MTF transform (real to complex DFT)
+        Parameters
+        ----------
+        shape : tuple of ints
+           shape of the input and output DFT
+
+        flags : tuple of strings
+           pyfftw planning flags
+    """
     i = pyfftw.empty_aligned(shape, dtype="float64")
     output_shape = (i.shape[0], i.shape[-1] // 2 + 1)
     o = pyfftw.empty_aligned(output_shape, dtype="complex128")
@@ -38,7 +69,16 @@ def create_real_plan(shape, flags):
     return DFT(pyfftw.FFTW(i, o, direction="FFTW_FORWARD", flags=flags))
 
 
-def create_real_plan_backward(shape, flags):
+def create_real_plan_backward(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.FFTW":
+    """Create plan for broadband PSF (complex to real) - inverse
+        Parameters
+        ----------
+        shape : tuple of ints
+           shape of the input and output DFT
+
+        flags : tuple of strings
+           pyfftw planning flags
+    """
     i = pyfftw.empty_aligned(shape, dtype="float64")
     output_shape = (i.shape[0], i.shape[-1] // 2 + 1)
     o = pyfftw.empty_aligned(output_shape, dtype="complex128")
