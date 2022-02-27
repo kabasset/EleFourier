@@ -88,7 +88,7 @@ def gen_rand_comp_array(sizex: int, sizey: int) -> "np.ndarray":
 
 
 def dummy_psf_broadband(
-    pupil: "np.ndarray", mask_side: int, psf_side: int, lambdas: int, wisdom: Tuple[str], param: int
+    pupil: "np.ndarray", mask_side: int, psf_side: int, lambdas: int, wisdom: Tuple[str], flags: Tuple[str], param: int
 ) -> Tuple[Any, Timer]:
     """Function to simulate pd computation. Loop over number of lambda value and compute 3 DFTs sequentially, sum all
     mono PSF and apply a single inverse DFT to compute broadband PSF
@@ -105,17 +105,21 @@ def dummy_psf_broadband(
         tuple:
           PSF broadband image and the chronometer associated to the computation
         """
-    pyfftw.import_wisdom(wisdom)
+
+    # TODO It does not seem necessary to import wisdom as it is shared between process context TBC
+    # TODO Remove wisdom argument
+    # pyfftw.import_wisdom(wisdom)
+    wisdom_flag = flags + ("FFTW_WISDOM_ONLY",)
     # Shortcuts for BranchDFTs attributes
     plan_chrono = Timer()
     plan_chrono.start()
-    plan = BranchDFTs(mask_side=mask_side, psf_side=psf_side, flags=("FFTW_WISDOM_ONLY",))
+    plan = BranchDFTs(mask_side=mask_side, psf_side=psf_side, flags=wisdom_flag)
     plan_chrono.stop()
     # print(f"# Profiling of DFTs for parameter {param}: {plan_chrono.elapsed_time:.3f} milliseconds")
 
-    dft_pupil_to_psf = plan.pupil_to_psf.plan
-    psf_to_mtf = plan.psf_to_mtf.plan
-    mtf_to_broadband = plan.mtf_to_broadband.plan
+    dft_pupil_to_psf = plan.pupil_to_psf
+    psf_to_mtf = plan.psf_to_mtf
+    mtf_to_broadband = plan.mtf_to_broadband
     chrono = plan.chrono
 
     # Store sum of mono DFT (use to simulate computation of broadband PSF)
@@ -228,7 +232,9 @@ def mainMethod(args):
     with mp.Pool(processes=branches) as pool:
         # Use functools partial function for the fixed input pupil mask
         # Suggested here https://stackoverflow.com/a/49358837
-        results = pool.map(partial(dummy_psf_broadband, pupil, mask_side, broadband_side, lambdas, wisdom), param_list)
+        results = pool.map(
+            partial(dummy_psf_broadband, pupil, mask_side, broadband_side, lambdas, wisdom, flags), param_list
+        )
 
         if args.print:
             for i, broadband in enumerate(results):

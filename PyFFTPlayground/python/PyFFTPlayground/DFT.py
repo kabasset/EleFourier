@@ -49,7 +49,7 @@ def create_complex_plan(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.FFTW":
     """
     i = pyfftw.empty_aligned(shape, dtype="complex128")
     o = pyfftw.empty_aligned(shape, dtype="complex128")
-    return DFT(pyfftw.FFTW(i, o, direction="FFTW_BACKWARD", flags=flags))
+    return pyfftw.FFTW(i, o, direction="FFTW_BACKWARD", flags=flags)
 
 
 def create_real_plan(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.FFTW":
@@ -66,7 +66,7 @@ def create_real_plan(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.FFTW":
     output_shape = (i.shape[0], i.shape[-1] // 2 + 1)
     o = pyfftw.empty_aligned(output_shape, dtype="complex128")
 
-    return DFT(pyfftw.FFTW(i, o, direction="FFTW_FORWARD", flags=flags))
+    return pyfftw.FFTW(i, o, direction="FFTW_FORWARD", flags=flags)
 
 
 def create_real_plan_backward(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.FFTW":
@@ -83,4 +83,4 @@ def create_real_plan_backward(shape: Tuple[int], flags: Tuple[str]) -> "pyfftw.F
     output_shape = (i.shape[0], i.shape[-1] // 2 + 1)
     o = pyfftw.empty_aligned(output_shape, dtype="complex128")
 
-    return DFT(pyfftw.FFTW(o, i, direction="FFTW_BACKWARD", flags=flags))
+    return pyfftw.FFTW(o, i, direction="FFTW_BACKWARD", flags=flags)
