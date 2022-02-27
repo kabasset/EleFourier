@@ -26,6 +26,7 @@
 """
 
 import argparse
+from socket import MSG_PEEK
 from typing import Tuple, Any
 import numpy as np
 from functools import partial
@@ -36,7 +37,8 @@ from functools import partial
 # There is an issue in pyfftw tracker which ask to pyfftw to add support for pickle in FFTW class
 # See https://github.com/pyFFTW/pyFFTW/issues/130
 # Using ThreadPoolExecutor
-import concurrent.futures
+import multiprocessing as mp
+import pyfftw
 
 import ElementsKernel.Logging as log
 import ElementsKernel.Exit as Exit
@@ -59,11 +61,10 @@ class BranchDFTs:
         Chronometer to monitor DFTs in each branches
     """
 
-    def __init__(self, mask_side: int, psf_side: int, flags: Tuple[str], lambdas: int):
+    def __init__(self, mask_side: int, psf_side: int, flags: Tuple[str]):
         self.pupil_to_psf = create_complex_plan((mask_side, mask_side), flags)
         self.psf_to_mtf = create_real_plan((mask_side, mask_side), flags)
         self.mtf_to_broadband = create_real_plan_backward((psf_side, psf_side), flags)
-        self.lambdas = lambdas
         self.chrono = Timer()
 
 
@@ -86,7 +87,9 @@ def gen_rand_comp_array(sizex: int, sizey: int) -> "np.ndarray":
     return np.random.randn(sizex, sizey) + np.random.randn(sizex, sizey) * 1j
 
 
-def dummy_psf_broadband(pupil: "np.ndarray", plan: BranchDFTs) -> Tuple[Any, Timer]:
+def dummy_psf_broadband(
+    pupil: "np.ndarray", mask_side: int, psf_side: int, lambdas: int, wisdom: Tuple[str], param: int
+) -> Tuple[Any, Timer]:
     """Function to simulate pd computation. Loop over number of lambda value and compute 3 DFTs sequentially, sum all
     mono PSF and apply a single inverse DFT to compute broadband PSF
 
@@ -102,12 +105,18 @@ def dummy_psf_broadband(pupil: "np.ndarray", plan: BranchDFTs) -> Tuple[Any, Tim
         tuple:
           PSF broadband image and the chronometer associated to the computation
         """
+    pyfftw.import_wisdom(wisdom)
     # Shortcuts for BranchDFTs attributes
+    plan_chrono = Timer()
+    plan_chrono.start()
+    plan = BranchDFTs(mask_side=mask_side, psf_side=psf_side, flags=("FFTW_WISDOM_ONLY",))
+    plan_chrono.stop()
+    # print(f"# Profiling of DFTs for parameter {param}: {plan_chrono.elapsed_time:.3f} milliseconds")
+
     dft_pupil_to_psf = plan.pupil_to_psf.plan
     psf_to_mtf = plan.psf_to_mtf.plan
     mtf_to_broadband = plan.mtf_to_broadband.plan
     chrono = plan.chrono
-    lambdas = plan.lambdas
 
     # Store sum of mono DFT (use to simulate computation of broadband PSF)
     mtf_shape = psf_to_mtf.output_array.shape
@@ -173,9 +182,7 @@ def defineSpecificProgramOptions():
     parser.add_argument("-l", "--lambdas", type=int, default=1, help="Number of wavelengths")
     parser.add_argument("-m", "--maskside", type=int, default=1024, help="Side size of input mask")
     parser.add_argument("-psf", "--psfside", type=int, default=512, help="Output PSF side size")
-    parser.add_argument(
-        "--print", action="store_true", help="Print information of DFTs computation time per parameter."
-    )
+    parser.add_argument("--print", action="store_true", help="Print detailed information of DFTs computation time.")
 
     return parser
 
@@ -206,29 +213,31 @@ def mainMethod(args):
 
     logger.info("# Initialize FFTW plans sequentially...")
     main_chrono.start()
-    plans = [BranchDFTs(mask_side, broadband_side, flags, lambdas) for p in range(params)]
+    # Planning
+    plans = BranchDFTs(mask_side, broadband_side, flags)
+    wisdom = pyfftw.export_wisdom()
     main_chrono.stop()
     logger.info(f"# Elapsed time for planning: {main_chrono.elapsed_time:.3f} milliseconds")
 
     # Generate random data for input pupil mask
     pupil = gen_rand_comp_array(mask_side, mask_side)
+    param_list = [x for x in range(params)]
 
     main_chrono.start()
-    # Use plan in parallel with concurrent.futures
-    # FIXME I was unable to implement it with multiprocessing (ProcessPool) as pyfftw objects are not compatible with pickle
-    with concurrent.futures.ThreadPoolExecutor(max_workers=branches) as executor:
+    # Use plan in parallel with multiprocessing
+    with mp.Pool(processes=branches) as pool:
         # Use functools partial function for the fixed input pupil mask
         # Suggested here https://stackoverflow.com/a/49358837
-        results = executor.map(partial(dummy_psf_broadband, pupil), plans)
+        results = pool.map(partial(dummy_psf_broadband, pupil, mask_side, broadband_side, lambdas, wisdom), param_list)
 
         if args.print:
             for i, broadband in enumerate(results):
                 chrono = broadband[1]
                 logger.info("#")
-                logger.info(f"# Profiling of DFTs for parameters {i}:")
-                logger.info("# DFTs time:")
+                logger.info(f"# Profiling of DFTs for parameter {i}:")
+                logger.info("# Timing per DFT:")
                 logger.info([f"{incs:.3f} milliseconds" for incs in chrono.incs])
-                logger.info(f"# Total elapsed time: {chrono.elapsed_time:.3f} milliseconds")
+                logger.info(f"# Total elapsed time for DFTs for parameter {i}: {chrono.elapsed_time:.3f} milliseconds")
                 logger.info("#")
 
     main_chrono.stop()
