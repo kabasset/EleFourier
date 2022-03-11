@@ -117,7 +117,7 @@ In this case, it is optimal to use the same Buffers for both Plans.
 
 To avoid polluting production code with low-level boilerplate,
 and to ensure forward and backward Plans are coherent,
-a ligth Plan wrapper and Plan makers can be implemented easily:
+a light Plan wrapper and Plan makers can be implemented easily:
 
 ```python
 class DFT:

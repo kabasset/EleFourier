@@ -177,8 +177,8 @@ public:
    * @param count The number of planes
    */
   DftPlan(Fits::Position<2> shape, long count = 1) : DftPlan(shape, count, nullptr, nullptr) {
-    assert(not(m_sharing & SharesIn));
-    assert(not(m_sharing & SharesOut));
+    assert(not(m_owning & OwnsIn));
+    assert(not(m_owning & OwnsOut));
   }
 
   DftPlan(const DftPlan&) = default;
