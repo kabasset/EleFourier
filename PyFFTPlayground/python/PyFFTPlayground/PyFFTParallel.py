@@ -111,17 +111,13 @@ def dummy_psf_broadband(
     # pyfftw.import_wisdom(wisdom)
     wisdom_flag = flags + ("FFTW_WISDOM_ONLY",)
     # Shortcuts for BranchDFTs attributes
-    plan_chrono = Timer()
-    plan_chrono.start()
     plan = BranchDFTs(mask_side=mask_side, psf_side=psf_side, flags=wisdom_flag)
-    plan_chrono.stop()
-    # print(f"# Profiling of DFTs for parameter {param}: {plan_chrono.elapsed_time:.3f} milliseconds")
 
     dft_pupil_to_psf = plan.pupil_to_psf
     psf_to_mtf = plan.psf_to_mtf
     mtf_to_broadband = plan.mtf_to_broadband
     chrono = plan.chrono
-
+    chrono.start()
     # Store sum of mono DFT (use to simulate computation of broadband PSF)
     mtf_shape = psf_to_mtf.output_array.shape
     mtf_dtype = psf_to_mtf.output_array.dtype
@@ -130,26 +126,29 @@ def dummy_psf_broadband(
     # DFT for each lambda
     for l in range(lambdas):
         # Compute DFT
-        chrono.start()
+        # chrono.start()
         # TODO Check if __call__ should be used here to update input array of FFTW plan
         # See https://pyfftw.readthedocs.io/en/latest/source/pyfftw/pyfftw.html#pyfftw.FFTW.__call__
         psf_mono = dft_pupil_to_psf(input_array=pupil)
-        chrono.stop()
+        # chrono.stop()
 
+        # chrono.start()
         # Multiply by random array (should be pupil * exponential(-2jPi/WFE)...)
         wfe = gen_rand_comp_array(psf_mono.shape[0], psf_mono.shape[1]) * l
         psf_mono *= wfe
         # Compute norm of mono psf (to apply DFT on real numbers)
         abs_psf_mono = np.abs(psf_mono)
+        # chrono.stop()
 
-        chrono.start()
+        # chrono.start()
         mtf = psf_to_mtf(input_array=abs_psf_mono)
-        chrono.stop()
+        # chrono.stop()
 
         # TODO Implement a more realistic way to merge each mono DFT
         # Update sum of mtf
         mtf_broad_sum += mtf
 
+    # chrono.start()
     # Convert lambdas arrays of size mask_side*mask_side to one array of size broadband_side*broadband_side
     # TODO Implement a more realistic generation of mono to multi broadband
     mtf_broad_sum /= lambdas
@@ -158,10 +157,12 @@ def dummy_psf_broadband(
     # Dummy selection here to simulate broadband of the correct shape
     broadband_shape = mtf_to_broadband.input_array.shape
     mtf_broad_sum = mtf_broad_sum[: broadband_shape[0], : broadband_shape[1]]
+    # chrono.stop()
 
     # Then compute the MTF broadband (inverse DFT)
-    chrono.start()
+    # chrono.start()
     broadband = mtf_to_broadband(input_array=mtf_broad_sum)
+
     chrono.stop()
 
     return broadband, chrono
@@ -223,11 +224,11 @@ def mainMethod(args):
     main_chrono.stop()
     logger.info(f"# Elapsed time for planning: {main_chrono.elapsed_time:.3f} milliseconds")
 
+    main_chrono.start()
     # Generate random data for input pupil mask
     pupil = gen_rand_comp_array(mask_side, mask_side)
     param_list = [x for x in range(params)]
 
-    main_chrono.start()
     # Use plan in parallel with multiprocessing
     with mp.Pool(processes=branches) as pool:
         # Use functools partial function for the fixed input pupil mask
@@ -243,7 +244,9 @@ def mainMethod(args):
                 logger.info(f"# Profiling of DFTs for parameter {i}:")
                 logger.info("# Timing per DFT:")
                 logger.info([f"{incs:.3f} milliseconds" for incs in chrono.incs])
-                logger.info(f"# Total elapsed time for DFTs for parameter {i}: {chrono.elapsed_time:.3f} milliseconds")
+                logger.info(
+                    f"# Total elapsed time for PSF broadband execution {i}: {chrono.elapsed_time:.3f} milliseconds"
+                )
                 logger.info("#")
 
     main_chrono.stop()
