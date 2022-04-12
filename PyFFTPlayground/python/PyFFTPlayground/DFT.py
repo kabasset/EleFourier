@@ -17,7 +17,6 @@
 #
 
 from typing import Tuple, Any
-from matplotlib.pyplot import axes
 import pyfftw
 
 
